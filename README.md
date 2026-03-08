@@ -1,9 +1,9 @@
 ## SGFault compiler project ##
 
 In this project I am exploring how compiled languages turn from written text to executable binaries. \
-The target is to develop a minimal programming language which can be compiled  like ./SGFault myFile.sg \
-and then ran like ./myFile.exe\
-\newline
+The target is to develop a minimal programming language which can be compiled  like `./SGFault myFile.sg` \
+and then ran like `./myFile.exe\`
+\
 Since this is only a side project this will only target x86-64 architectures and it will make use of\
 NASM and the GNU linker to get libraries working. The compiler will be written in C.\
 \
