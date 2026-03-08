@@ -10,3 +10,7 @@ NASM and the GNU linker to get libraries working. The compiler will be written i
 The motivation for doing this, is to get a deeper understanding of low level programming and to become\
 more fluent in C. There is no end-goal for this project, but it is not intended revolutionize anything.\
 It is merely a practice project done for fun.
+
+# Current notes #
+
+Currently the program runs with `make run` which compiles the main and in the end creates and runs an executable in build.

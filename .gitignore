@@ -58,3 +58,4 @@ dkms.conf
 SGFault
 *.asm
 .vscode/
+build/
