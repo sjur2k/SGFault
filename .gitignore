@@ -59,3 +59,4 @@ SGFault
 *.asm
 .vscode/
 build/
+testing/

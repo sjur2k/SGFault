@@ -13,4 +13,8 @@ It is merely a practice project done for fun.
 
 # Current notes #
 
-Currently the program runs with `make run` which compiles the main and in the end creates and runs an executable in build.
+
+## Installation
+git clone https://github.com/sjur2k/SGFault
+cd sgfault
+(sudo) make install
