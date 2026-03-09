@@ -2,12 +2,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include "utils.h"
 #define NUM_FLAGS 4
 
-// Helper function since strcmp is counter intuitive
-bool str_eq(char* str1, char* str2){
-    return strcmp(str1,str2)==0;
-}
 typedef struct CompilerArgs{
     char *source_file;
     char *output_name;
@@ -88,8 +85,8 @@ CompilerArgs parse_args(int argc, char* argv[]){
     CompilerArgs args = {argv[1], file_name, output_dir, in, out, verbose};
     return args;
 }
-void compile(CompilerArgs *args){
-    //Write assembly file
+
+void generate_asm(CompilerArgs* args){
     //PLACEHOLDER CODE:
     fprintf(args->out,"global _start\n\n");
     fprintf(args->out,"_start:\n");
@@ -98,24 +95,27 @@ void compile(CompilerArgs *args){
     fprintf(args->out,"\tsyscall");
     fclose(args->out);
     args->out = NULL;
+}
 
+void compilation_commands(CompilerArgs* args){
+    
     //Tell system to assemble and link:
     char output_path[256];
-    char nasm_command[sizeof(output_path)*2 + 64];
-    char linker_command[sizeof(output_path)*2 + 64];
-    char cleanup_command[sizeof(output_path)*2 + 64];
+    char nasm_command[1024];
+    char linker_command[1024];
+    char cleanup_command[1024]; // Bufsize might be a bit overkill
     
-    snprintf(output_path,sizeof(output_path),"%s/%s",args->output_dir,args->output_name);
+    snprintf(output_path, sizeof(output_path), "%s/%s", args->output_dir, args->output_name);
     snprintf(nasm_command, sizeof(nasm_command), "nasm -f elf64 %s.asm -o %s.o", output_path, output_path);
     snprintf(linker_command, sizeof(linker_command), "ld %s.o -o %s", output_path, output_path);
     snprintf(cleanup_command, sizeof(cleanup_command), "rm -f %s.o %s.asm", output_path, output_path);
 
-    if (system(nasm_command)){
+    if (system(nasm_command) != 0){
         system(cleanup_command);
         fprintf(stderr, "Error: assembly failed\n");
         exit(1);
     }
-    if (system(linker_command)){
+    if (system(linker_command) != 0){
         system(cleanup_command);
         fprintf(stderr,"Error: linking failed\n");
         exit(1);
@@ -124,8 +124,13 @@ void compile(CompilerArgs *args){
         system(cleanup_command);
     }
 }
+
 int main(int argc, char *argv[]){
     CompilerArgs args = parse_args(argc,argv);
-    compile(&args);
+    
+    //tokenize();
+    //parse_tokens();
+    generate_asm(&args);
+    compilation_commands(&args);
     return 0;
 }

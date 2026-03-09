@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g
-SRC = src/sgfault.c
+SRC = src/sgfault.c src/utils.c
 
 NAME = $(basename $(notdir $(FILE)))
 COMPILER_BINARY = build/sgfault
