@@ -6,7 +6,7 @@ NAME = $(basename $(notdir $(FILE)))
 COMPILER_BINARY = build/sgfault
 
 
-.PHONY: build install clean mkdir
+.PHONY: mkdir build install clean 
 
 mkdir:
 	@mkdir -p build
