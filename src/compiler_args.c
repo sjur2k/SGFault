@@ -1,5 +1,10 @@
 #include "compiler_args.h"
-#include "stdbool.h"
+
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "utils.h"
 
 CompilerArgs parse_args(int argc, char* argv[]){
     if(argc < 2 || argc > NUM_FLAGS+2){
