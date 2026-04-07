@@ -31,6 +31,8 @@ typedef struct{
 
 TokenList tokenlist_create();
 void tokenlist_push(TokenList *t_list, Token t);
+void tokenlist_print(TokenList t_list);
+void tokenlist_free(TokenList *t_list);
 
-TokenList tokenize(CompilerArgs *args);
+void tokenize(TokenList* t_list, CompilerArgs *args);
 #endif
