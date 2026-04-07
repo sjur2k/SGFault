@@ -10,9 +10,9 @@ void generate_asm(TokenList* t_list, CompilerArgs* args){
     fprintf(args->out,"\tmov rdi, 0\n");
     fprintf(args->out,"\tmov rax, 60\n");
     fprintf(args->out,"\tsyscall");
-    fclose(args->out)
+    fclose(args->out);
     
-    args->out = NULL
+    args->out = NULL;
 }
 
 int main(int argc, char *argv[]){

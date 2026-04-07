@@ -77,8 +77,26 @@ void tokenize(TokenList* t_list, CompilerArgs* args){
             while(isdigit(symbol = fgetc(args->in))){
                 buf_push(buf,&i,symbol);
             }
+            TokenType number_type = _int_literal;
+            if (symbol=='.'){
+                number_type = _float;
+                int next_symbol = fgetc(args->in);
+                if(!isdigit(next_symbol)){
+                    fprintf(stderr, "Decimal point without decimals is undefined behavior.");
+                    exit(1);
+                }
+                buf_push(buf,&i,symbol);
+                buf_push(buf,&i,next_symbol);
+                while(isdigit(symbol = fgetc(args->in))){
+                    buf_push(buf,&i,symbol);
+                }
+                if(symbol=='.'){
+                    fprintf(stderr, "Floating point numbers can only have one decimal point.");
+                    exit(1);
+                }
+            }
             buf_push(buf,&i,'\0');
-            tokenlist_push(t_list,(Token){_int_literal,strdup(buf)});
+            tokenlist_push(t_list,(Token){number_type,strdup(buf)});
             // Restore symbol and reset buf
             ungetc(symbol,args->in);
             i=0;
@@ -114,6 +132,9 @@ void tokenize(TokenList* t_list, CompilerArgs* args){
                     break;
                 case ',':
                     tokenlist_push(t_list,(Token){_comma,","});
+                    break;
+                default:
+                    fprintf(stderr,"Bad token: %s",symbol);
                     break;
             }
         }

@@ -1,5 +1,5 @@
-#ifndef SGFAULT_ARGS
-#define SGFAULT_ARGS
+#ifndef SGFAULT_ARGS_H
+#define SGFAULT_ARGS_H
 #include "stdio.h"
 #include "stdbool.h"
 #define NUM_FLAGS 4 //Currently

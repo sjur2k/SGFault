@@ -1,5 +1,5 @@
-#ifndef SGFAULT_LEXER
-#define SGFAULT_LEXER
+#ifndef SGFAULT_LEXER_H
+#define SGFAULT_LEXER_H
 
 #define MAX_TOKEN_LEN 256
 
@@ -8,6 +8,7 @@
 typedef enum {
     _variable,
     _int_literal,
+    _float,
     _equal,
     _point,
     _comma,

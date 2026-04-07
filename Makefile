@@ -16,9 +16,9 @@ build: mkdir
 
 run: build
 	@echo "Building..."
-	@$(COMPILER_BINARY) $(FILE)
+	@$(COMPILER_BINARY) $(FILE) -o $(dir $(FILE))$(NAME)
 	@echo "\nRunning..."
-	@./$(NAME)
+	@./$(dir $(FILE))$(NAME)
 
 install: build
 	@cp build/sgfault /usr/local/bin/sgfault
@@ -27,5 +27,6 @@ install: build
 
 clean:
 	@rm -rf build/
+	@rm -f testing/test
 
 	
