@@ -4,6 +4,6 @@
 #include "compiler_args.h"
 #include "lexer.h"
 
-void parser(TokenList* t_list, CompilerArgs* args);
+/* void parse(TokenList* t_list, CompilerArgs* args); */
 
 #endif

@@ -40,6 +40,7 @@ CompilerArgs parse_args(int argc, char* argv[]){
                 fprintf(stderr,"Error: --output (-o) requires a file name\n");
                 exit(1);
             }
+            free(file_name);
             file_name = argv[i+1];
             i++;
         }else if(str_eq(argv[i],"--output-dir")||str_eq(argv[i],"-d")){
@@ -53,9 +54,9 @@ CompilerArgs parse_args(int argc, char* argv[]){
             system("cat docs/help.txt");
             exit(0);
         }else{
-            fprintf(stderr, "Error: Undefined flag use");
+            fprintf(stderr, "Error: Undefined flag use\n");
             fprintf(stderr, "Usage: sgfault <my_file.sg> [flags]\n");
-            fprintf(stderr, "Use --help for a list of valid flags");
+            fprintf(stderr, "Use --help for a list of valid flags\n");
             exit(1);
         }
     }

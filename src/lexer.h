@@ -21,7 +21,8 @@ typedef enum {
 }TokenType;
 typedef struct{
     TokenType type;
-    char *value; // Optional. Nullptr if N/A
+    char *value; // NULL if N/A. Currently string representation for debugging.
+    bool owned;
 }Token;
 
 typedef struct{

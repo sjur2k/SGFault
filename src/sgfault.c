@@ -1,10 +1,9 @@
 #include "compiler_args.h"
 #include "lexer.h"
+#include "parser.h"
 
-void generate_asm(TokenList* t_list, CompilerArgs* args){
+void generate_asm(CompilerArgs* args){
     //PLACEHOLDER CODE:
-    int num_tokens = t_list->size;
-    printf("Number of tokens: %d\n",num_tokens);
     fprintf(args->out,"global _start\n\n");
     fprintf(args->out,"_start:\n");
     fprintf(args->out,"\tmov rdi, 0\n");
@@ -18,13 +17,15 @@ void generate_asm(TokenList* t_list, CompilerArgs* args){
 int main(int argc, char *argv[]){
     CompilerArgs args = parse_args(argc,argv);
     
-
     TokenList t_list = tokenlist_create();
     tokenize(&t_list,&args);
-    //tokenlist_print(t_list);
     
-    generate_asm(&t_list,&args);
-    tokenlist_free(&t_list);
+    //parse(&t_list, &args);
+    tokenlist_print(t_list);
+    generate_asm(&args);
     compilation_commands(&args);
+
+    // Garbage collection
+    tokenlist_free(&t_list);
     return 0;
 }

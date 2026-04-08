@@ -6,6 +6,8 @@
 #include <string.h>
 #include "utils.h"
 
+int line_number = 1;
+
 /* Must be freed */
 TokenList tokenlist_create(){
     TokenList t_list;
@@ -24,23 +26,29 @@ void tokenlist_push(TokenList *t_list,Token t){
 }
 
 void tokenlist_print(TokenList t_list){
-    int i = 0;
-    printf("Tokens:\n");
-    while(t_list.data[i].type != _eof){
-        printf("[%s] , ",t_list.data[i].value);
-        i++;
+    printf("Tokens (%d total):\n",(int)t_list.size);
+    for(size_t i = 0; i<t_list.size; i++){
+        printf("[%s] ",t_list.data[i].value);
+        if(i%8 == 7){
+            printf("\n");
+        }
     }
-    printf("[EOF]");
+    printf("\n");
 }
 
 void tokenlist_free(TokenList *t_list){
+    for(size_t i = 0; i < t_list->size; i++){
+        if(t_list->data[i].owned){
+            free(t_list->data[i].value);
+        }
+    }
     free(t_list->data);
     t_list->data = NULL;
 }
 
 static void buf_push(char* buf, int *i, char c){
     if(*i >= MAX_TOKEN_LEN){
-        fprintf(stderr,"Max token length exceeded");
+        fprintf(stderr,"Error on line %d: Max token length exceeded\n",line_number);
         exit(1);
     }
     buf[*i] = c;
@@ -51,95 +59,131 @@ static bool is_word_delimiter(int c){
     return !isalnum(c);
 }
 
+static int peek_next_symbol(CompilerArgs *args) {
+    int c = fgetc(args->in);
+    ungetc(c,args->in);
+    return c;
+}
+
+static void tokenize_word(TokenList* t_list, CompilerArgs* args, char* buf, int symbol){
+    int i = 0;
+    TokenType word_type;
+    buf_push(buf,&i,symbol);
+    while(!is_word_delimiter(symbol = fgetc(args->in))){
+        buf_push(buf,&i,symbol);
+    }
+    buf_push(buf,&i,'\0');
+    if (str_eq(buf,"return")){
+        word_type = _return;
+    } else {
+        word_type = _variable;
+    }
+    tokenlist_push(t_list,(Token){word_type,strdup(buf),true});
+    
+    // Restore symbol and reset buf
+    ungetc(symbol,args->in);
+}
+
+static void tokenize_number(TokenList* t_list, CompilerArgs* args, char* buf, int symbol){
+    int i = 0;
+    TokenType number_type = _int_literal; //Assume integer
+    if (symbol == '0' && isdigit(peek_next_symbol(args))){
+        fprintf(stderr, "Error on line %d: Nonzero numbers cannot begin with 0\n",line_number);
+        exit(1);
+    }
+    if (symbol == '.'){
+        number_type = _float;
+    }
+    buf_push(buf,&i,symbol);
+    while(isdigit(symbol = fgetc(args->in))){
+        buf_push(buf,&i,symbol);
+    }
+    if (symbol=='.'){
+        if(number_type == _float){
+            fprintf(stderr, "Error on line %d: Floating point numbers can only have one decimal point.\n",line_number);
+            exit(1);
+        }
+        number_type = _float;
+        if(!isdigit(peek_next_symbol(args))){
+            fprintf(stderr, "Error on line %d: Floating points without decimals are undefined.\n",line_number);
+            exit(1);
+        }
+        buf_push(buf,&i,symbol);
+        while(isdigit(symbol = fgetc(args->in))){
+            buf_push(buf,&i,symbol);
+        }
+        if(symbol == '.'){
+            fprintf(stderr, "Error on line %d: Floating point numbers can only have one decimal point.\n",line_number);
+            exit(1);
+        }
+    } else if (isalpha(symbol) || symbol == '_'){
+        fprintf(stderr, "Error on line %d: Variables cannot begin with a number.\n",line_number);
+        exit(1);
+    }
+    buf_push(buf,&i,'\0');
+    tokenlist_push(t_list,(Token){number_type,strdup(buf),true});
+    // Restore symbol and reset buf
+    ungetc(symbol,args->in);
+}
+
+static void tokenize_symbol(TokenList* t_list, int symbol){
+    if(isspace(symbol)){
+        if(symbol == '\n'){
+            line_number++;
+        }
+        return;
+    }
+    switch (symbol){
+        case '(':
+            tokenlist_push(t_list,(Token){_par_open,"(",false});
+            break;
+        case ')':
+            tokenlist_push(t_list,(Token){_par_close,")",false});
+            break;
+        case '=':
+            tokenlist_push(t_list,(Token){_equal,"=",false});
+            break;
+        case '+':
+            tokenlist_push(t_list,(Token){_operator,"+",false});
+            break;
+        case '-':
+            tokenlist_push(t_list,(Token){_operator,"-",false});
+            break;
+        case '/':
+            tokenlist_push(t_list,(Token){_operator,"/",false});
+            break;
+        case '*':
+            tokenlist_push(t_list,(Token){_operator,"*",false});
+            break;
+        case ';':
+            tokenlist_push(t_list,(Token){_semicolon,";",false});
+            break;
+        case '.':
+            tokenlist_push(t_list,(Token){_point,".",false});
+            break;
+        case ',':
+            tokenlist_push(t_list,(Token){_comma,",",false});
+            break;
+        default:
+            fprintf(stderr,"Error on line %d: %c is a bad token\n",line_number,(unsigned char)symbol);
+            exit(1);
+    }
+}
+
 void tokenize(TokenList* t_list, CompilerArgs* args){
     int symbol;
     char buf[MAX_TOKEN_LEN] = {0};
-    int i = 0;
     while ((symbol = fgetc(args->in))!=EOF){
         //printf("%c",symbol);
-        if(isalpha(symbol)||symbol=='_'){
-            buf_push(buf,&i,symbol);
-            while(!is_word_delimiter(symbol = fgetc(args->in))){
-                buf_push(buf,&i,symbol);
-            }
-            if (str_eq(buf,"return")){
-                tokenlist_push(t_list,(Token){_return,NULL});
-            } else {
-                buf_push(buf,&i,'\0');
-                tokenlist_push(t_list, (Token){_variable,strdup(buf)});
-            }
-            // Restore symbol and reset buf
-            ungetc(symbol,args->in);
-            i=0;
-            buf[0] = '\0';
-        } else if (isdigit(symbol)){
-            buf_push(buf,&i,symbol);
-            while(isdigit(symbol = fgetc(args->in))){
-                buf_push(buf,&i,symbol);
-            }
-            TokenType number_type = _int_literal;
-            if (symbol=='.'){
-                number_type = _float;
-                int next_symbol = fgetc(args->in);
-                if(!isdigit(next_symbol)){
-                    fprintf(stderr, "Decimal point without decimals is undefined behavior.");
-                    exit(1);
-                }
-                buf_push(buf,&i,symbol);
-                buf_push(buf,&i,next_symbol);
-                while(isdigit(symbol = fgetc(args->in))){
-                    buf_push(buf,&i,symbol);
-                }
-                if(symbol=='.'){
-                    fprintf(stderr, "Floating point numbers can only have one decimal point.");
-                    exit(1);
-                }
-            }
-            buf_push(buf,&i,'\0');
-            tokenlist_push(t_list,(Token){number_type,strdup(buf)});
-            // Restore symbol and reset buf
-            ungetc(symbol,args->in);
-            i=0;
-            buf[0] = '\0';
-        } else {
-            switch (symbol){
-                case '(':
-                    tokenlist_push(t_list,(Token){_par_open,"("});
-                    break;
-                case ')':
-                    tokenlist_push(t_list,(Token){_par_close,")"});
-                    break;
-                case '=':
-                    tokenlist_push(t_list,(Token){_equal,"="});
-                    break;
-                case '+':
-                    tokenlist_push(t_list,(Token){_operator,"+"});
-                    break;
-                case '-':
-                    tokenlist_push(t_list,(Token){_operator,"-"});
-                    break;
-                case '/':
-                    tokenlist_push(t_list,(Token){_operator,"/"});
-                    break;
-                case '*':
-                    tokenlist_push(t_list,(Token){_operator,"*"});
-                    break;
-                case ';':
-                    tokenlist_push(t_list,(Token){_semicolon,";"});
-                    break;
-                case '.':
-                    tokenlist_push(t_list,(Token){_point,"."});
-                    break;
-                case ',':
-                    tokenlist_push(t_list,(Token){_comma,","});
-                    break;
-                default:
-                    fprintf(stderr,"Bad token: %s",symbol);
-                    break;
-            }
+        if (isalpha(symbol)||symbol=='_') {
+            tokenize_word(t_list,args,buf,symbol);
+        }else if(isdigit(symbol) || (symbol=='.' && isdigit(peek_next_symbol(args)))){
+            tokenize_number(t_list,args,buf,symbol);
+        }else{
+            tokenize_symbol(t_list,symbol);
         }
     }
-    tokenlist_push(t_list,(Token){_eof,"eof"});
+    tokenlist_push(t_list,(Token){_eof,"EOF",false});
     t_list->data = realloc(t_list->data,(t_list->size)*sizeof(Token));
     fclose(args->in);
 }
