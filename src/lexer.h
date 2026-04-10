@@ -13,7 +13,8 @@ typedef struct{
 } LexerContext;
 
 typedef enum {
-    _variable,
+    _error,
+    _identifier,
     _int_literal,
     _str_literal,
     _float,
@@ -23,7 +24,10 @@ typedef enum {
     _semicolon,
     _par_open,
     _par_close,
-    _operator,
+    _sub,
+    _add,
+    _mul,
+    _div,
     _return,
     _eof,
     _TOKEN_TYPE_COUNT
@@ -44,6 +48,5 @@ typedef struct{
 TokenList tokenlist_create();
 void tokenlist_print(TokenList t_list);
 void tokenlist_free(TokenList *t_list);
-void tokenize(TokenList *t_list, LexerContext *lexer_args);
-bool is_keyword(const char *word);
+void tokenize(TokenList *t_list, LexerContext *context);
 #endif

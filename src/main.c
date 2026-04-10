@@ -16,10 +16,10 @@ void generate_asm(CompilerArgs *args){
 
 int main(int argc, char *argv[]){
     CompilerArgs args = parse_args(argc,argv);
-    LexerContext lexer_args = {.in = args.in, .line_number = 1, .has_error = false};
+    LexerContext context = {.in = args.in, .line_number = 1, .has_error = false};
 
     TokenList t_list = tokenlist_create();
-    tokenize(&t_list,&lexer_args);
+    tokenize(&t_list,&context);
     
     //parse(&t_list, &args);
     tokenlist_print(t_list);
@@ -29,5 +29,6 @@ int main(int argc, char *argv[]){
     // Garbage collection / Cleanup
     compiler_args_free(&args);
     tokenlist_free(&t_list);
-    return 0;
+
+    return context.has_error ? 1 : 0;
 }
