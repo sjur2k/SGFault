@@ -41,7 +41,7 @@ CompilerArgs parse_args(int argc, char* argv[]){
                 exit(1);
             }
             free(file_name);
-            file_name = argv[i+1];
+            file_name = strdup(argv[i+1]);
             i++;
         }else if(str_eq(argv[i],"--output-dir")||str_eq(argv[i],"-d")){
             if (i+1 >= argc){
@@ -75,7 +75,14 @@ CompilerArgs parse_args(int argc, char* argv[]){
         exit(1);
     }
     
-    CompilerArgs args = {argv[1], file_name, output_dir, in, out, verbose};
+    CompilerArgs args = {
+        .source_file = argv[1],
+        .output_name = file_name,
+        .output_dir = output_dir,
+        .in = in,
+        .out = out,
+        .verbose = verbose,
+    };
     return args;
 }
 
@@ -105,4 +112,9 @@ void compilation_commands(CompilerArgs* args){
     if (!args->verbose){
         system(cleanup_command);
     }
+}
+
+void compiler_args_free(CompilerArgs* args){
+    fclose(args->in);
+    free(args->output_name);
 }

@@ -5,9 +5,17 @@
 
 #include <stdlib.h>
 #include "compiler_args.h"
+
+typedef struct{
+    FILE *in;
+    int line_number;
+    bool has_error;
+} LexerContext;
+
 typedef enum {
     _variable,
     _int_literal,
+    _str_literal,
     _float,
     _equal,
     _point,
@@ -17,8 +25,10 @@ typedef enum {
     _par_close,
     _operator,
     _return,
-    _eof
+    _eof,
+    _TOKEN_TYPE_COUNT
 }TokenType;
+
 typedef struct{
     TokenType type;
     char *value; // NULL if N/A. Currently string representation for debugging.
@@ -32,9 +42,8 @@ typedef struct{
 }TokenList;
 
 TokenList tokenlist_create();
-void tokenlist_push(TokenList *t_list, Token t);
 void tokenlist_print(TokenList t_list);
 void tokenlist_free(TokenList *t_list);
+void tokenize(TokenList* t_list, LexerContext* lexer_args);
 
-void tokenize(TokenList* t_list, CompilerArgs *args);
 #endif

@@ -6,23 +6,13 @@
 #include <string.h>
 #include "utils.h"
 
-int line_number = 1;
-
 /* Must be freed */
 TokenList tokenlist_create(){
     TokenList t_list;
     t_list.size = 0;
-    t_list.capacity = 1000; // Assuming most programs will be small (~200 lines)
+    t_list.capacity = 64;
     t_list.data = malloc(t_list.capacity*sizeof(Token));
     return t_list;
-}
-
-void tokenlist_push(TokenList *t_list,Token t){
-    if(t_list->capacity == t_list->size){
-        t_list->capacity *= 2;
-        t_list->data = realloc(t_list->data,(t_list->capacity)*sizeof(Token));
-    }
-    t_list->data[t_list->size++] = t;
 }
 
 void tokenlist_print(TokenList t_list){
@@ -46,144 +36,200 @@ void tokenlist_free(TokenList *t_list){
     t_list->data = NULL;
 }
 
-static void buf_push(char* buf, int *i, char c){
+static void tokenlist_push(TokenList *t_list,Token t){
+    if(t_list->capacity == t_list->size){
+        t_list->capacity *= 2;
+        t_list->data = realloc(t_list->data,(t_list->capacity)*sizeof(Token));
+    }
+    t_list->data[t_list->size++] = t;
+}
+
+static void buf_push(char* buf, int *i, char c, LexerContext* lexer_args){
     if(*i >= MAX_TOKEN_LEN){
-        fprintf(stderr,"Error on line %d: Max token length exceeded\n",line_number);
+        fprintf(stderr,"Error on line %d: Max token length exceeded\n",lexer_args->line_number);
         exit(1);
     }
     buf[*i] = c;
     (*i)++;
 }
+
 static bool is_word_delimiter(int c){
     if(c=='_') return false;
     return !isalnum(c);
 }
 
-static int peek_next_symbol(CompilerArgs *args) {
-    int c = fgetc(args->in);
-    ungetc(c,args->in);
+static int peek_char(LexerContext* lexer_args) {
+    int c = fgetc(lexer_args->in);
+    ungetc(c,lexer_args->in);
     return c;
 }
 
-static void tokenize_word(TokenList* t_list, CompilerArgs* args, char* buf, int symbol){
+static void tokenize_identifier(TokenList* t_list, LexerContext* lexer_args, int symbol){
     int i = 0;
+    char buf[MAX_TOKEN_LEN] = {0};
+    buf_push(buf,&i,symbol,lexer_args);
     TokenType word_type;
-    buf_push(buf,&i,symbol);
-    while(!is_word_delimiter(symbol = fgetc(args->in))){
-        buf_push(buf,&i,symbol);
+    while(!is_word_delimiter(symbol = fgetc(lexer_args->in))){
+        buf_push(buf,&i,symbol,lexer_args);
     }
-    buf_push(buf,&i,'\0');
+    buf_push(buf,&i,'\0',lexer_args);
     if (str_eq(buf,"return")){
         word_type = _return;
     } else {
         word_type = _variable;
     }
-    tokenlist_push(t_list,(Token){word_type,strdup(buf),true});
-    
-    // Restore symbol and reset buf
-    ungetc(symbol,args->in);
+    tokenlist_push(
+        t_list,
+        (Token){
+            .type = word_type,
+            .value = strdup(buf),
+            .owned = true
+        }
+    );
 }
 
-static void tokenize_number(TokenList* t_list, CompilerArgs* args, char* buf, int symbol){
+static void tokenize_string(TokenList* t_list, LexerContext* lexer_args, int symbol){
     int i = 0;
+    char buf[MAX_TOKEN_LEN] = {0};
+    buf_push(buf, &i, symbol, lexer_args);
+    while((symbol = fgetc(lexer_args->in))!='"'){
+        buf_push(buf, &i, symbol, lexer_args);
+    }
+    buf_push(buf, &i, symbol, lexer_args);
+    buf_push(buf, &i, '\0', lexer_args);
+    tokenlist_push(
+        t_list,
+        (Token){
+            .type = _str_literal,
+            .value = strdup(buf),
+            .owned = true
+        }
+    );
+}
+
+static void tokenize_number(TokenList* t_list, LexerContext* lexer_args, int symbol){
+    int i = 0;
+    char buf[MAX_TOKEN_LEN] = {0};
     TokenType number_type = _int_literal; //Assume integer
-    if (symbol == '0' && isdigit(peek_next_symbol(args))){
-        fprintf(stderr, "Error on line %d: Nonzero numbers cannot begin with 0\n",line_number);
+    if (symbol == '0' && isdigit(peek_char(lexer_args))){
+        fprintf(stderr, "Error on line %d: Nonzero numbers cannot begin with 0\n",lexer_args->line_number);
         exit(1);
     }
     if (symbol == '.'){
         number_type = _float;
     }
-    buf_push(buf,&i,symbol);
-    while(isdigit(symbol = fgetc(args->in))){
-        buf_push(buf,&i,symbol);
+    buf_push(buf,&i,symbol,lexer_args);
+    while(isdigit(symbol = fgetc(lexer_args->in))){
+        buf_push(buf,&i,symbol,lexer_args);
     }
     if (symbol=='.'){
         if(number_type == _float){
-            fprintf(stderr, "Error on line %d: Floating point numbers can only have one decimal point.\n",line_number);
+            fprintf(stderr, "Error on line %d: Floating point numbers can only have one decimal point.\n",lexer_args->line_number);
             exit(1);
         }
         number_type = _float;
-        if(!isdigit(peek_next_symbol(args))){
-            fprintf(stderr, "Error on line %d: Floating points without decimals are undefined.\n",line_number);
+        if(!isdigit(peek_char(lexer_args))){
+            fprintf(stderr, "Error on line %d: Floating points without decimals are undefined.\n",lexer_args->line_number);
             exit(1);
         }
-        buf_push(buf,&i,symbol);
-        while(isdigit(symbol = fgetc(args->in))){
-            buf_push(buf,&i,symbol);
+        buf_push(buf,&i,symbol,lexer_args);
+        while(isdigit(symbol = fgetc(lexer_args->in))){
+            buf_push(buf,&i,symbol,lexer_args);
         }
         if(symbol == '.'){
-            fprintf(stderr, "Error on line %d: Floating point numbers can only have one decimal point.\n",line_number);
+            fprintf(stderr, "Error on line %d: Floating point numbers can only have one decimal point.\n",lexer_args->line_number);
             exit(1);
         }
     } else if (isalpha(symbol) || symbol == '_'){
-        fprintf(stderr, "Error on line %d: Variables cannot begin with a number.\n",line_number);
+        fprintf(stderr, "Error on line %d: Variables cannot begin with a number.\n",lexer_args->line_number);
         exit(1);
     }
-    buf_push(buf,&i,'\0');
-    tokenlist_push(t_list,(Token){number_type,strdup(buf),true});
-    // Restore symbol and reset buf
-    ungetc(symbol,args->in);
+    buf_push(buf,&i,'\0',lexer_args);
+    tokenlist_push(
+        t_list,
+        (Token){
+            .type  = number_type,
+            .value = strdup(buf),
+            .owned = true
+        }
+    );
 }
 
-static void tokenize_symbol(TokenList* t_list, int symbol){
+static void tokenize_symbol(TokenList* t_list, LexerContext* lexer_args, int symbol){
     if(isspace(symbol)){
         if(symbol == '\n'){
-            line_number++;
+            lexer_args->line_number++;
         }
         return;
     }
+    TokenType symbol_type;
     switch (symbol){
         case '(':
-            tokenlist_push(t_list,(Token){_par_open,"(",false});
+            symbol_type = _par_open;
             break;
         case ')':
-            tokenlist_push(t_list,(Token){_par_close,")",false});
+            symbol_type = _par_close;
             break;
         case '=':
-            tokenlist_push(t_list,(Token){_equal,"=",false});
+            symbol_type = _equal;
             break;
         case '+':
-            tokenlist_push(t_list,(Token){_operator,"+",false});
+            symbol_type = _operator;
             break;
         case '-':
-            tokenlist_push(t_list,(Token){_operator,"-",false});
+            symbol_type = _operator;
             break;
         case '/':
-            tokenlist_push(t_list,(Token){_operator,"/",false});
+            symbol_type = _operator;
             break;
         case '*':
-            tokenlist_push(t_list,(Token){_operator,"*",false});
+            symbol_type = _operator;
             break;
         case ';':
-            tokenlist_push(t_list,(Token){_semicolon,";",false});
+            symbol_type = _semicolon;
             break;
         case '.':
-            tokenlist_push(t_list,(Token){_point,".",false});
+            symbol_type = _point;
             break;
         case ',':
-            tokenlist_push(t_list,(Token){_comma,",",false});
+            symbol_type = _comma;
             break;
         default:
-            fprintf(stderr,"Error on line %d: %c is a bad token\n",line_number,(unsigned char)symbol);
+            fprintf(stderr,"Error on line %d: %c is undefined.\n",lexer_args->line_number,(unsigned char)symbol);
             exit(1);
     }
+    char value[2] = {symbol,'\0'};
+    tokenlist_push(
+        t_list,
+        (Token){
+            .type = symbol_type,
+            .value = strdup(value),
+            .owned = true
+        }
+    );
 }
 
-void tokenize(TokenList* t_list, CompilerArgs* args){
+void tokenize(TokenList* t_list, LexerContext* lexer_args){
     int symbol;
-    char buf[MAX_TOKEN_LEN] = {0};
-    while ((symbol = fgetc(args->in))!=EOF){
+    while ((symbol = fgetc(lexer_args->in))!=EOF){
         //printf("%c",symbol);
         if (isalpha(symbol)||symbol=='_') {
-            tokenize_word(t_list,args,buf,symbol);
-        }else if(isdigit(symbol) || (symbol=='.' && isdigit(peek_next_symbol(args)))){
-            tokenize_number(t_list,args,buf,symbol);
+            tokenize_identifier(t_list,lexer_args,symbol);
+        }else if(symbol=='"'){
+            tokenize_string(t_list,lexer_args,symbol);
+        }else if(isdigit(symbol) || (symbol=='.' && isdigit(peek_char(lexer_args)))){
+            tokenize_number(t_list,lexer_args,symbol);
         }else{
-            tokenize_symbol(t_list,symbol);
+            tokenize_symbol(t_list,lexer_args,symbol);
         }
     }
-    tokenlist_push(t_list,(Token){_eof,"EOF",false});
+    tokenlist_push(
+        t_list,
+        (Token){
+            .type = _eof,
+            .value = "EOF",
+            .owned = false
+        }
+    );
     t_list->data = realloc(t_list->data,(t_list->size)*sizeof(Token));
-    fclose(args->in);
 }
