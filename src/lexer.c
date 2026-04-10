@@ -44,9 +44,9 @@ static void tokenlist_push(TokenList *t_list,Token t){
     t_list->data[t_list->size++] = t;
 }
 
-static void buf_push(char* buf, int *i, char c, LexerContext* lexer_args){
+static void buf_push(char *buf, int *i, char c, LexerContext *lexer_args){
     if(*i >= MAX_TOKEN_LEN){
-        fprintf(stderr,"Error on line %d: Max token length exceeded\n",lexer_args->line_number);
+        fprintf(stderr,"\033[1;31mError on line %d:\033[0;0m Max token length exceeded\n",lexer_args->line_number);
         exit(1);
     }
     buf[*i] = c;
@@ -54,24 +54,25 @@ static void buf_push(char* buf, int *i, char c, LexerContext* lexer_args){
 }
 
 static bool is_word_delimiter(int c){
-    if(c=='_') return false;
-    return !isalnum(c);
+    if(c==EOF) return true;
+    return !isalnum((unsigned char)c) && c!='_';
 }
 
-static int peek_char(LexerContext* lexer_args) {
+static int peek_char(LexerContext *lexer_args) {
     int c = fgetc(lexer_args->in);
     ungetc(c,lexer_args->in);
     return c;
 }
 
-static void tokenize_identifier(TokenList* t_list, LexerContext* lexer_args, int symbol){
+static void tokenize_identifier(TokenList *t_list, LexerContext *lexer_args, int symbol){
     int i = 0;
     char buf[MAX_TOKEN_LEN] = {0};
     buf_push(buf,&i,symbol,lexer_args);
     TokenType word_type;
     while(!is_word_delimiter(symbol = fgetc(lexer_args->in))){
-        buf_push(buf,&i,symbol,lexer_args);
+       buf_push(buf,&i,symbol,lexer_args);
     }
+    ungetc(symbol, lexer_args->in);
     buf_push(buf,&i,'\0',lexer_args);
     if (str_eq(buf,"return")){
         word_type = _return;
@@ -88,11 +89,23 @@ static void tokenize_identifier(TokenList* t_list, LexerContext* lexer_args, int
     );
 }
 
-static void tokenize_string(TokenList* t_list, LexerContext* lexer_args, int symbol){
+static void tokenize_string(TokenList *t_list, LexerContext *lexer_args, int symbol){
     int i = 0;
+    int opening_line = lexer_args->line_number;
     char buf[MAX_TOKEN_LEN] = {0};
     buf_push(buf, &i, symbol, lexer_args);
     while((symbol = fgetc(lexer_args->in))!='"'){
+        if (symbol == EOF){
+            fprintf(
+                stderr, 
+                "\033[1;31mError on line %d:\033[0;0m String literal beginning on line %d is missing closing quote\n",
+                lexer_args->line_number, opening_line
+            );
+            exit(1);
+        }
+        if (symbol == '\n'){
+            lexer_args->line_number++;
+        }
         buf_push(buf, &i, symbol, lexer_args);
     }
     buf_push(buf, &i, symbol, lexer_args);
@@ -107,12 +120,12 @@ static void tokenize_string(TokenList* t_list, LexerContext* lexer_args, int sym
     );
 }
 
-static void tokenize_number(TokenList* t_list, LexerContext* lexer_args, int symbol){
+static void tokenize_number(TokenList *t_list, LexerContext *lexer_args, int symbol){
     int i = 0;
     char buf[MAX_TOKEN_LEN] = {0};
     TokenType number_type = _int_literal; //Assume integer
     if (symbol == '0' && isdigit(peek_char(lexer_args))){
-        fprintf(stderr, "Error on line %d: Nonzero numbers cannot begin with 0\n",lexer_args->line_number);
+        fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Nonzero numbers cannot begin with 0\n",lexer_args->line_number);
         exit(1);
     }
     if (symbol == '.'){
@@ -122,14 +135,15 @@ static void tokenize_number(TokenList* t_list, LexerContext* lexer_args, int sym
     while(isdigit(symbol = fgetc(lexer_args->in))){
         buf_push(buf,&i,symbol,lexer_args);
     }
+    
     if (symbol=='.'){
         if(number_type == _float){
-            fprintf(stderr, "Error on line %d: Floating point numbers can only have one decimal point.\n",lexer_args->line_number);
+            fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Floating point numbers can only have one decimal point.\n",lexer_args->line_number);
             exit(1);
         }
         number_type = _float;
         if(!isdigit(peek_char(lexer_args))){
-            fprintf(stderr, "Error on line %d: Floating points without decimals are undefined.\n",lexer_args->line_number);
+            fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Floating points without decimals are undefined.\n",lexer_args->line_number);
             exit(1);
         }
         buf_push(buf,&i,symbol,lexer_args);
@@ -137,13 +151,14 @@ static void tokenize_number(TokenList* t_list, LexerContext* lexer_args, int sym
             buf_push(buf,&i,symbol,lexer_args);
         }
         if(symbol == '.'){
-            fprintf(stderr, "Error on line %d: Floating point numbers can only have one decimal point.\n",lexer_args->line_number);
+            fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Floating point numbers can only have one decimal point.\n",lexer_args->line_number);
             exit(1);
         }
     } else if (isalpha(symbol) || symbol == '_'){
-        fprintf(stderr, "Error on line %d: Variables cannot begin with a number.\n",lexer_args->line_number);
+        fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Variables cannot begin with a number.\n",lexer_args->line_number);
         exit(1);
     }
+    ungetc(symbol, lexer_args->in);
     buf_push(buf,&i,'\0',lexer_args);
     tokenlist_push(
         t_list,
@@ -155,7 +170,7 @@ static void tokenize_number(TokenList* t_list, LexerContext* lexer_args, int sym
     );
 }
 
-static void tokenize_symbol(TokenList* t_list, LexerContext* lexer_args, int symbol){
+static void tokenize_symbol(TokenList *t_list, LexerContext *lexer_args, int symbol){
     if(isspace(symbol)){
         if(symbol == '\n'){
             lexer_args->line_number++;
@@ -195,7 +210,7 @@ static void tokenize_symbol(TokenList* t_list, LexerContext* lexer_args, int sym
             symbol_type = _comma;
             break;
         default:
-            fprintf(stderr,"Error on line %d: %c is undefined.\n",lexer_args->line_number,(unsigned char)symbol);
+            fprintf(stderr,"\033[1;31mError on line %d:\033[0;0m %c is undefined in this context.\n",lexer_args->line_number,(unsigned char)symbol);
             exit(1);
     }
     char value[2] = {symbol,'\0'};
@@ -209,7 +224,7 @@ static void tokenize_symbol(TokenList* t_list, LexerContext* lexer_args, int sym
     );
 }
 
-void tokenize(TokenList* t_list, LexerContext* lexer_args){
+void tokenize(TokenList *t_list, LexerContext *lexer_args){
     int symbol;
     while ((symbol = fgetc(lexer_args->in))!=EOF){
         //printf("%c",symbol);

@@ -2,7 +2,7 @@
 #include "lexer.h"
 #include "parser.h"
 
-void generate_asm(CompilerArgs* args){
+void generate_asm(CompilerArgs *args){
     //PLACEHOLDER CODE:
     fprintf(args->out,"global _start\n\n");
     fprintf(args->out,"_start:\n");

@@ -1,5 +1,5 @@
 #include "parser.h"
 
-/* void parse(TokenList* t_list, CompilerArgs* args){
+/* void parse(TokenList *t_list, CompilerArgs *args){
     
 } */

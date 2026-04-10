@@ -5,17 +5,17 @@
 #define NUM_FLAGS 4 //Currently
 
 typedef struct CompilerArgs{
-    char* source_file;
-    char* output_name;
-    char* output_dir;
-    FILE* in;
-    FILE* out;
+    char *source_file;
+    char *output_name;
+    char *output_dir;
+    FILE *in;
+    FILE *out;
     bool verbose;
 }CompilerArgs;
 
-CompilerArgs parse_args(int argc, char* argv[]);
+CompilerArgs parse_args(int argc, char *argv[]);
 
-void compilation_commands(CompilerArgs* args);
+void compilation_commands(CompilerArgs *args);
 
-void compiler_args_free(CompilerArgs* args);
+void compiler_args_free(CompilerArgs *args);
 #endif

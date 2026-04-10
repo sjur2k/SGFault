@@ -1,5 +1,4 @@
-*.o
-*.d
 build/
 testing/
 .vscode/
+NOTES.txt

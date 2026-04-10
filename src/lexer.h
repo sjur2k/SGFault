@@ -36,7 +36,7 @@ typedef struct{
 }Token;
 
 typedef struct{
-    Token* data;
+    Token *data;
     size_t size;
     size_t capacity;
 }TokenList;
@@ -44,6 +44,6 @@ typedef struct{
 TokenList tokenlist_create();
 void tokenlist_print(TokenList t_list);
 void tokenlist_free(TokenList *t_list);
-void tokenize(TokenList* t_list, LexerContext* lexer_args);
-
+void tokenize(TokenList *t_list, LexerContext *lexer_args);
+bool is_keyword(const char *word);
 #endif
