@@ -6,6 +6,26 @@
 #include <string.h>
 #include "utils.h"
 
+const char *token_type_names[_TOKEN_TYPE_COUNT] = {
+    [_error]            = "Error",
+    [_identifier]       = "Identifier",
+    [_int_literal]      = "Int",
+    [_str_literal]      = "Str",
+    [_float_literal]    = "Float",
+    [_equal]            = "Equal",
+    [_point]            = "Point",
+    [_comma]            = "Comma",
+    [_semicolon]        = "Semicolon",
+    [_par_open]         = "Par_open",
+    [_par_close]        = "Par_close",
+    [_sub]              = "Sub",
+    [_add]              = "Add",
+    [_mul]              = "Mul",
+    [_div]              = "Div",
+    [_return]           = "Return",
+    [_eof]              = "Eof"
+};
+
 // ----------- TOKENLISTS(-BUFFERS) ----------------
 
 /* Must be freed */
@@ -18,14 +38,12 @@ TokenList tokenlist_create(){
 }
 
 void tokenlist_print(TokenList t_list){
-    printf("Tokens (%d total):\n",(int)t_list.size);
+    printf("\n\033[4mTokens - %d total:\033[0m\n",(int)t_list.size);
     for(size_t i = 0; i<t_list.size; i++){
         if (t_list.data[i].value == NULL)
-            printf("[\033[31merror\033[0m] ");
+            printf("\033[31mError\033[0m\n");
         else
-            printf("[%s] ",t_list.data[i].value);
-        if(i%8 == 7) 
-            printf("\n");
+            printf("Value: %-15sType: %s\n",t_list.data[i].value, token_type_names[t_list.data[i].type]);
     }
     printf("\n");
 }
@@ -74,7 +92,7 @@ typedef struct{
 
 static Buffer char_buffer_create(int bufsize){
     Buffer buf = {
-        .data = malloc(sizeof(char)*bufsize),
+        .data = malloc(sizeof(char)*(bufsize+1)), // Explicit room for null-terminator
         .bufsize = bufsize,
     };
     return buf;
@@ -87,7 +105,7 @@ static void char_buffer_free(Buffer *buf){
 
 
 static bool push_char(Buffer *buf, int *i, char c, LexerContext *context){
-    if(*i >= MAX_TOKEN_LEN-1){
+    if(*i >= MAX_TOKEN_LEN){
         fprintf(stderr,"\033[1;31mError on line %d:\033[0;0m Max token length (%d) exceeded\n",context->line_number,MAX_TOKEN_LEN);
         context->has_error = true;
         return false;
@@ -98,7 +116,7 @@ static bool push_char(Buffer *buf, int *i, char c, LexerContext *context){
 }
 
 static void push_string_char(Buffer *buf, int *i, char c){
-    if(*i >= buf->bufsize-1){
+    if(*i >= buf->bufsize){
         buf->bufsize *= 2;
         buf->data = realloc(buf->data, sizeof(char)*buf->bufsize);
     }
@@ -134,7 +152,7 @@ static void tokenize_identifier(TokenList *t_list, LexerContext *context, int sy
     ungetc(symbol, context->in);
     
     if(has_room) {
-        push_char(&buf,&i,'\0',context);
+        buf.data[i]='\0';
         TokenType kw = keyword_type(buf.data);
         word_type = kw == _error ? _identifier : kw;
     } else {
@@ -153,6 +171,7 @@ static void tokenize_identifier(TokenList *t_list, LexerContext *context, int sy
 
 static void tokenize_string(TokenList *t_list, LexerContext *context, int symbol){
     int i = 0;
+    bool ok = true;
     int opening_line = context->line_number;
     Buffer buf = char_buffer_create(64); // Resizes automatically. Is limited by size of input document.
     while((symbol = fgetc(context->in))!='"'){
@@ -163,18 +182,19 @@ static void tokenize_string(TokenList *t_list, LexerContext *context, int symbol
                 context->line_number, opening_line
             );
             context->has_error = true;
+            ok = false;
             break;
         }
         if (symbol == '\n') context->line_number++;
         push_string_char(&buf, &i, symbol);
     }
-    push_string_char(&buf, &i, '\0');
+    if(ok) push_string_char(&buf, &i, '\0');
     tokenlist_push(
         t_list,
         (Token){
-            .type = _str_literal,
-            .value = strdup(buf.data),
-            .owned = true
+            .type = ok ? _str_literal : _error,
+            .value = ok ? strdup(buf.data): NULL,
+            .owned = ok
         }
     );
     char_buffer_free(&buf);
@@ -190,7 +210,7 @@ static void tokenize_number(TokenList *t_list, LexerContext *context, int symbol
         context->has_error = true;
         ok = false;
     }
-    if (symbol == '.') number_type = _float;
+    if (symbol == '.') number_type = _float_literal;
     bool has_room = push_char(&buf,&i,symbol,context);
     while(isdigit(symbol = fgetc(context->in))){
         if(has_room) has_room = push_char(&buf,&i,symbol,context);
@@ -198,12 +218,12 @@ static void tokenize_number(TokenList *t_list, LexerContext *context, int symbol
     
     if (symbol=='.'){
         if(has_room) has_room = push_char(&buf, &i, symbol,context);
-        if(number_type == _float){
+        if(number_type == _float_literal){
             fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Floating point numbers can only have one decimal point.\n",context->line_number);
             context->has_error = true;
             ok = false;
         }
-        number_type = _float;
+        number_type = _float_literal;
         if(!isdigit(peek_char(context))){
             fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Floating points without decimals are undefined.\n",context->line_number);
             context->has_error = true;
@@ -223,7 +243,7 @@ static void tokenize_number(TokenList *t_list, LexerContext *context, int symbol
         ok = false;
     }
     ungetc(symbol, context->in);
-    if (has_room) push_char(&buf,&i,'\0',context);
+    if (has_room) buf.data[i]='\0';
     tokenlist_push(
             t_list,
             (Token){
@@ -277,6 +297,7 @@ static void tokenize_symbol(TokenList *t_list, LexerContext *context, int symbol
             fprintf(stderr,"\033[1;31mError on line %d:\033[0;0m %c is undefined in this context.\n",context->line_number,(unsigned char)symbol);
             context->has_error = true;
             ok = false;
+            symbol_type = _error;
     }
     char value[2] = {symbol,'\0'};
     tokenlist_push(
@@ -311,4 +332,5 @@ void tokenize(TokenList *t_list, LexerContext *context){
         }
     );
     t_list->data = realloc(t_list->data,(t_list->size)*sizeof(Token));
+    if(!context->has_error) fprintf(stdout,"\033[1;32mNo syntactical errors detected!\033[0m\n");
 }

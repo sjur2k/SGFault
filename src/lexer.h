@@ -17,7 +17,7 @@ typedef enum {
     _identifier,
     _int_literal,
     _str_literal,
-    _float,
+    _float_literal,
     _equal,
     _point,
     _comma,
@@ -32,6 +32,8 @@ typedef enum {
     _eof,
     _TOKEN_TYPE_COUNT
 }TokenType;
+
+extern const char *token_type_names[_TOKEN_TYPE_COUNT];
 
 typedef struct{
     TokenType type;

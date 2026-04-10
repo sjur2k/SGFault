@@ -29,6 +29,6 @@ int main(int argc, char *argv[]){
     // Garbage collection / Cleanup
     compiler_args_free(&args);
     tokenlist_free(&t_list);
-
+    
     return context.has_error ? 1 : 0;
 }

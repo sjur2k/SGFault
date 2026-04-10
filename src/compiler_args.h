@@ -1,7 +1,7 @@
 #ifndef SGFAULT_ARGS_H
 #define SGFAULT_ARGS_H
-#include "stdio.h"
-#include "stdbool.h"
+#include <stdio.h>
+#include <stdbool.h>
 #define NUM_FLAGS 4 //Currently
 
 typedef struct CompilerArgs{

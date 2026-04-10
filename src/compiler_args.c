@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <linux/limits.h>
 #include "utils.h"
 
 CompilerArgs parse_args(int argc, char *argv[]){
@@ -84,7 +85,7 @@ CompilerArgs parse_args(int argc, char *argv[]){
         exit(1);
     }
     
-    char output_file[255];
+    char output_file[PATH_MAX];
     snprintf(output_file,sizeof(output_file),"%s/%s.asm",output_dir,file_name);
     FILE *out = fopen(output_file,"w");
     if (!out) {
@@ -106,10 +107,10 @@ CompilerArgs parse_args(int argc, char *argv[]){
 void compilation_commands(CompilerArgs *args){
     
     //Tell system to assemble and link:
-    char output_path[256];
-    char nasm_command[1024];
-    char linker_command[1024];
-    char cleanup_command[1024]; // Bufsize might be a bit overkill
+    char output_path[PATH_MAX]; 
+    char nasm_command[2*PATH_MAX + 23]; // This is a bit pedantic, but helps me build understanding
+    char linker_command[2*PATH_MAX + 8];
+    char cleanup_command[2*PATH_MAX + 12];
     
     snprintf(output_path, sizeof(output_path), "%s/%s", args->output_dir, args->output_name);
     snprintf(nasm_command, sizeof(nasm_command), "nasm -f elf64 %s.asm -o %s.o", output_path, output_path);

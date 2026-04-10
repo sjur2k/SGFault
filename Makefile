@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Wpedantic -g
-SRC = src/sgfault.c src/utils.c src/lexer.c src/compiler_args.c src/parser.c
+SRC = src/main.c src/utils.c src/lexer.c src/compiler_args.c src/parser.c
 
 COMPILER_BINARY = build/sgfault
 FILE = testing/test.sg
