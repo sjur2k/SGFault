@@ -26,7 +26,6 @@ install: mkdir
 	@cp build/sgfault /usr/local/bin/sgfault
 	@mkdir -p /usr/local/share/sgfault/docs
 	@cp docs/* /usr/local/share/sgfault/docs
-	@rm -rf build/
 	@echo "\n\033[32mInstallation sucessful!\n\033[0m"
 
 clean:
