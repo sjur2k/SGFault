@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Wpedantic -g
+CFLAGS = -Wall -Wextra -Wpedantic -Wstrict-prototypes -g -DDATA_DIR=\"/usr/local/share/sgfault\"
 SRC = src/main.c src/utils.c src/lexer.c src/compiler_args.c src/parser.c
 
 COMPILER_BINARY = build/sgfault
@@ -12,21 +12,29 @@ mkdir:
 	@mkdir -p build
 
 build: mkdir
-	@$(CC) $(CFLAGS) $(SRC) -o $(COMPILER_BINARY)
-
-run: build
 	@echo "\n\033[32mBuilding...\033[0m"
-	@$(COMPILER_BINARY) $(FILE) -o $(dir $(FILE))$(NAME)
-	@echo "\n\033[32mRunning...\033[0m"
+	@$(CC) $(CFLAGS) -o $(COMPILER_BINARY) $(SRC) 
+
+run: build # ONLY FOR TESTING
+	@$(COMPILER_BINARY) -o $(dir $(FILE))$(NAME) $(FILE)
+	@echo "\n\033[32mRunning compiled file...\033[0m"
 	@./$(dir $(FILE))$(NAME)
 
-install: build
+install: mkdir
+	@echo "\n\033[32mInstalling SGFault ...\033[0m"
+	@$(CC) $(CFLAGS) -o $(COMPILER_BINARY) $(SRC) 
 	@cp build/sgfault /usr/local/bin/sgfault
+	@mkdir -p /usr/local/share/sgfault/docs
+	@cp docs/* /usr/local/share/sgfault/docs
 	@rm -rf build/
-	@echo "Installed SGfault\n"
+	@echo "\n\033[32mInstallation sucessful!\n\033[0m"
 
 clean:
 	@rm -rf build/
 	@rm -f testing/test
 
-	
+uninstall:
+	@echo "\n\033[32mUninstalling SGFault ...\033[0m"
+	@rm -rf /usr/local/share/sgfault
+	@rm -f /usr/local/bin/sgfault
+	@echo "\n\033[32mUninstallation sucessful!\n\033[0m"

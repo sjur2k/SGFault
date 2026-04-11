@@ -11,7 +11,7 @@ The motivation for doing this, is to get a deeper understanding of low level pro
 more fluent in C. There is no end-goal for this project, but it is not intended to revolutionize anything.\
 It is merely a practice project done for fun.
 
-## Installation ##
-`git clone https://github.com/sjur2k/SGFault`\
+## Installation for local user ##
+`git clone https://github.com/sjur2k/SGFault.git`\
 `cd sgfault`\
 `(sudo) make install`

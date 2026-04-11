@@ -3,73 +3,70 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <linux/limits.h>
 #include "utils.h"
 
+#ifndef DATA_DIR
+#define DATA_DIR "/usr/local/share/sgfault"
+#endif
+
+static void print_help(void){
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/docs/help.txt", DATA_DIR);
+    FILE* help_file = fopen(path, "r");
+    if(help_file == NULL){
+        fprintf(stderr,"\033[1;31mError:\033[0m Couldn't open help file.\n");
+        exit(1);
+    }
+    int symbol;
+    while ((symbol = fgetc(help_file))!=EOF){
+        putchar(symbol);
+    }
+    fclose(help_file);
+}
+
 CompilerArgs parse_args(int argc, char *argv[]){
-    if(argc < 2 || argc > NUM_FLAGS+2){
+    if(argc < 2 || argc > NUM_OPTIONS+2){
         fprintf(stderr,"Usage: sgfault <myFile.sg> [flags]\n");
         exit(1);
     }
+    if(str_eq(argv[argc-1],"-h")||str_eq(argv[argc-1],"--help")){
+        print_help();
+        exit(0);
+    };
 
-    char *file_name = strdup(argv[1]);
-    char *slash = strrchr(file_name, '/');
+    char *output_path = strdup(argv[argc-1]); // Uses name of src file unless set o-flag
+    char *slash = strrchr(output_path, '/');
     if (slash) {
-        memmove(file_name,slash+1,strlen(slash));
+        memmove(output_path,slash+1,strlen(slash));
     }
-    if (strlen(file_name)>100){
+    if (strlen(output_path)>100){
         fprintf(stderr, "\033[1;31mError:\033[0;0m use shorter filenames.\n");
         exit(1);
     }
-    char *extension = strrchr(file_name,'.');
+    char *extension = strrchr(output_path,'.');
     if (!extension || !str_eq(extension,".sg")){
         fprintf(stderr, "\033[1;31mError:\033[0;0m expected a .sg file\n");
         fprintf(stderr,"Usage: sgfault <myFile.sg> [flags]\n");
         exit(1);
     }
-    *extension = '\0'; // Now file_name is terminated at the point
+    *extension = '\0';
     
     bool verbose = false;
-    char *output_dir = strdup(".");
     //In future check second condition against a list of valid flags.
-    for (int i = 2; i < argc; i++){
+    for (int i = 1; i < argc-1; i++){
         if (str_eq(argv[i],"--verbose") || str_eq(argv[i],"-v")){
             verbose = true;
         }else if(str_eq(argv[i],"--output") || str_eq(argv[i],"-o")){
             if (i+1 >= argc){
-                fprintf(stderr,"\033[1;31mError:\033[0;0m --output (-o) requires a file name\n");
+                fprintf(stderr,"\033[1;31mError:\033[0;0m --output (-o) requires a file path\n");
                 exit(1);
             }
-            free(file_name);
-            file_name = strdup(argv[i+1]);
-            i++;
-        }else if(str_eq(argv[i],"--output-dir")||str_eq(argv[i],"-d")){
-            if (i+1 >= argc){
-                fprintf(stderr,"\033[1;31mError:\033[0;0m --output-dir (-d) requires a directory path\n");
-                exit(1);
-            }
-            output_dir = strdup(argv[i+1]);
+            free(output_path);
+            output_path = strdup(argv[i+1]);
             i++;
         }else if(str_eq(argv[i],"--help") || str_eq(argv[i],"-h")){
-            // Find, read and output help information in docs/help.txt
-            char exe_path[1024];
-            ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path)-1);
-            exe_path[len]='\0';
-            char *last_slash = strrchr(exe_path,'/');
-            *last_slash = '\0';
-            char help_path[2048];
-            snprintf(help_path, sizeof(help_path), "%s/../docs/help.txt", exe_path);
-            FILE *help_file = fopen(help_path,"r");
-            if(help_file == NULL){
-                fprintf(stderr,"\033[1;31mError:\033[0m Couldn't open help file.\n");
-                exit(1);
-            }
-            int symbol;
-            while ((symbol = fgetc(help_file))!=EOF){
-                putchar(symbol);
-            }
-            fclose(help_file);
+            print_help();
             exit(0);
         }else{
             fprintf(stderr, "\033[1;31mError:\033[0;0m Undefined flag use\n");
@@ -79,27 +76,24 @@ CompilerArgs parse_args(int argc, char *argv[]){
         }
     }
 
-    FILE *in = fopen(argv[1], "r");
-    if (!in) {
-        fprintf(stderr,"\033[1;31mError:\033[0;0m Couldn't open source file");
+    FILE *source_file = fopen(argv[argc-1], "r");
+    if (!source_file) {
+        fprintf(stderr,"\033[1;31mError:\033[0;0m Couldn't open source file: %s\n",argv[argc-1]);
         exit(1);
     }
     
-    char output_file[PATH_MAX];
-    snprintf(output_file,sizeof(output_file),"%s/%s.asm",output_dir,file_name);
-    FILE *out = fopen(output_file,"w");
+    char output_path_asm[PATH_MAX];
+    snprintf(output_path_asm,sizeof(output_path_asm),"%s.asm",output_path);
+    FILE *out = fopen(output_path_asm,"w");
     if (!out) {
-        fprintf(stderr,"\033[1;31mError:\033[0;0m Couldn't create assembly file");
+        fprintf(stderr,"\033[1;31mError:\033[0;0m Couldn't create assembly file: %s\n",output_path_asm);
         exit(1);
     }
-    
     CompilerArgs args = {
-        .source_file = argv[1],
-        .output_name = file_name,
-        .output_dir = output_dir,
-        .in = in,
-        .out = out,
-        .verbose = verbose,
+        .output_path    = output_path,
+        .source_file    = source_file,
+        .out            = out,
+        .verbose        = verbose,
     };
     return args;
 }
@@ -107,15 +101,13 @@ CompilerArgs parse_args(int argc, char *argv[]){
 void compilation_commands(CompilerArgs *args){
     
     //Tell system to assemble and link:
-    char output_path[PATH_MAX]; 
     char nasm_command[2*PATH_MAX + 23]; // This is a bit pedantic, but helps me build understanding
     char linker_command[2*PATH_MAX + 8];
     char cleanup_command[2*PATH_MAX + 12];
     
-    snprintf(output_path, sizeof(output_path), "%s/%s", args->output_dir, args->output_name);
-    snprintf(nasm_command, sizeof(nasm_command), "nasm -f elf64 %s.asm -o %s.o", output_path, output_path);
-    snprintf(linker_command, sizeof(linker_command), "ld %s.o -o %s", output_path, output_path);
-    snprintf(cleanup_command, sizeof(cleanup_command), "rm -f %s.o %s.asm", output_path, output_path);
+    snprintf(nasm_command, sizeof(nasm_command), "nasm -f elf64 %s.asm -o %s.o", args->output_path, args->output_path);
+    snprintf(linker_command, sizeof(linker_command), "ld %s.o -o %s", args->output_path, args->output_path);
+    snprintf(cleanup_command, sizeof(cleanup_command), "rm -f %s.o %s.asm", args->output_path, args->output_path);
 
     if (system(nasm_command) != 0){
         system(cleanup_command);
@@ -133,7 +125,6 @@ void compilation_commands(CompilerArgs *args){
 }
 
 void compiler_args_free(CompilerArgs *args){
-    fclose(args->in);
-    free(args->output_name);
-    free(args->output_dir);
+    fclose(args->source_file);
+    free(args->output_path);
 }

@@ -2,31 +2,28 @@ sgfault - The SGFault Compiler
 ===============================
 
 USAGE:
-    sgfault <file.sg> [flags]
+    sgfault [options] <source_file>
 
-ARGUMENTS:
-    <file.sg>          Path to source code. Must have .sg file extension.
+REQUIRED:
+    <source_file>           Absolute or relative path to source code file. Must have .sg file extension.
 
-FLAGS:
-    -o, --output       Next argument sets custom binary output name.
+OPTIONS:
+    -o, --output <path>     Sets custom output path. Accepts both relative and absolute paths.
 
-    -d, --output-dir   Next argument sets custom binary output directory.
+    -v, --verbose           Enable verbose output. Keeps intermediary assembly and object files.
 
-    -v, --verbose      Enable verbose output. Ommits deletion of intermediary assembly and object files.
-
-    -h, --help         Show this help message and exit with code 0.
+    -h, --help              Show this help message and exit with code 0.
 
 EXAMPLES:
-    sgfault myFile.sg
-    sgfault myFile.sg -o myProgram
-    sgfault myFile.sg --verbose
-    sgfault src/myFile.sg -o build/myProgram -v
+    sgfault my_file.sg
+    sgfault -o my_program my_file.sg 
+    sgfault my_file.sg --verbose
+    sgfault -o ~/my_project/build/my_program -v src/my_file.sg
 
 OUTPUT:
-    Default output name is the same as input source file name.
-    Default output directory is the current directory.
+    Default output path is the same as input.
+    sgfault path/name.sg -> path/name
 
 NOTES:
-    - File names must be 100 characters or fewer.
-    - Flags can be in any order after the source file.
-    - If you want to
+    - File paths must not be longer than 4096 characters.
+    - Options can be in any order between compiler command name and the source file.

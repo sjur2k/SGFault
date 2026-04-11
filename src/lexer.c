@@ -1,9 +1,10 @@
 #include "lexer.h"
 
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <ctype.h>
-#include <string.h>
 #include "utils.h"
 
 const char *token_type_names[_TOKEN_TYPE_COUNT] = {
@@ -35,6 +36,13 @@ TokenList tokenlist_create(){
     t_list.capacity = 64;
     t_list.data = malloc(t_list.capacity*sizeof(Token));
     return t_list;
+}
+LexerContext lexer_context_create(FILE *source_file){
+    return (LexerContext){
+        .in = source_file,
+        .line_number = 1,
+        .has_error = false
+    };
 }
 
 void tokenlist_print(TokenList t_list){

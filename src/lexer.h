@@ -3,14 +3,17 @@
 
 #define MAX_TOKEN_LEN 256
 
+#include <stdio.h>
 #include <stdlib.h>
-#include "compiler_args.h"
+#include <stdbool.h>
 
 typedef struct{
     FILE *in;
     int line_number;
     bool has_error;
 } LexerContext;
+
+LexerContext lexer_context_create(FILE *source_file);
 
 typedef enum {
     _error,
@@ -47,7 +50,7 @@ typedef struct{
     size_t capacity;
 }TokenList;
 
-TokenList tokenlist_create();
+TokenList tokenlist_create(void);
 void tokenlist_print(TokenList t_list);
 void tokenlist_free(TokenList *t_list);
 void tokenize(TokenList *t_list, LexerContext *context);
