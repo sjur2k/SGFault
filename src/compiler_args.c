@@ -98,7 +98,7 @@ CompilerArgs parse_args(int argc, char *argv[]){
     return args;
 }
 
-void compilation_commands(CompilerArgs *args){
+void build_binary(CompilerArgs *args){
     
     //Tell system to assemble and link:
     char nasm_command[2*PATH_MAX + 23]; // This is a bit pedantic, but helps me build understanding

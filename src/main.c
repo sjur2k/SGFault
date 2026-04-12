@@ -16,19 +16,26 @@ void generate_asm(CompilerArgs *args){
 
 int main(int argc, char *argv[]){
     CompilerArgs args = parse_args(argc,argv);
-    LexerContext context = lexer_context_create(args.source_file);
-    TokenList t_list = tokenlist_create();
-    tokenize(&t_list,&context);
     
-
-    //parse(&t_list, &args);
+    // ---- LEXICAL ANALYSIS ----
+    LexerContext lexer_context = lexer_context_create(args.source_file);
+    TokenList t_list = tokenlist_create();
+    tokenize(&t_list,&lexer_context);   
     tokenlist_print(t_list);
-    generate_asm(&args);
-    compilation_commands(&args);
 
-    // Garbage collection / Cleanup
+    // ---- GRAMMAR ANALYSIS / ABSTRACT SYNTAX TREE (AST) GENERATION ----
+    ParserContext parser_context = parser_context_create();
+    parse(&t_list, &parser_context);
+
+    // ---- WALK AST -> ASSEMBLY ----
+    generate_asm(&args);
+
+    // ---- ASSEMBLE AND LINK ----
+    build_binary(&args);
+
+    // ---- CLEANUP / GARBAGE COLLECTION ----
     compiler_args_free(&args);
     tokenlist_free(&t_list);
     
-    return context.has_error ? 1 : 0;
+    return lexer_context.has_error || parser_context.has_error ? 1 : 0;
 }
