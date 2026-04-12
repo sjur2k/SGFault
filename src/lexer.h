@@ -1,19 +1,11 @@
 #ifndef SGFAULT_LEXER_H
 #define SGFAULT_LEXER_H
 
-#define MAX_TOKEN_LEN 256
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
-typedef struct{
-    FILE *in;
-    int line_number;
-    bool has_error;
-} LexerContext;
-
-LexerContext lexer_context_create(FILE *source_file);
+#define MAX_TOKEN_LEN 256
 
 typedef enum {
     _error,
@@ -36,11 +28,9 @@ typedef enum {
     _TOKEN_TYPE_COUNT
 }TokenType;
 
-extern const char *token_type_names[_TOKEN_TYPE_COUNT];
-
 typedef struct{
     TokenType type;
-    char *value; // NULL if N/A. Currently string representation for debugging.
+    char *value;
     bool owned;
 }Token;
 
@@ -50,8 +40,18 @@ typedef struct{
     size_t capacity;
 }TokenList;
 
+typedef struct{
+    TokenList *t_list;
+    FILE *in;
+    int line_number;
+    bool has_error;
+} LexerContext;
+
+extern const char *token_type_names[_TOKEN_TYPE_COUNT];
+
 TokenList tokenlist_create(void);
 void tokenlist_print(TokenList t_list);
 void tokenlist_free(TokenList *t_list);
-void tokenize(TokenList *t_list, LexerContext *context);
+void tokenize(LexerContext *context);
+LexerContext lexer_context_create(TokenList *t_list, FILE *source_file);
 #endif

@@ -1,10 +1,10 @@
-#include "lexer.h"
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <ctype.h>
+
+#include "lexer.h"
 #include "utils.h"
 
 const char *token_type_names[_TOKEN_TYPE_COUNT] = {
@@ -24,7 +24,7 @@ const char *token_type_names[_TOKEN_TYPE_COUNT] = {
     [_mul]              = "Mul",
     [_div]              = "Div",
     [_return]           = "Return",
-    [_eof]              = "Eof"
+    [_eof]              = "Eof",
 };
 
 // ----------- TOKENLISTS(-BUFFERS) ----------------
@@ -37,17 +37,18 @@ TokenList tokenlist_create(){
     t_list.data = malloc(t_list.capacity*sizeof(Token));
     return t_list;
 }
-LexerContext lexer_context_create(FILE *source_file){
+LexerContext lexer_context_create(TokenList *t_list, FILE *source_file){
     return (LexerContext){
+        .t_list = t_list,
         .in = source_file,
         .line_number = 1,
-        .has_error = false
+        .has_error = false,
     };
 }
 
 void tokenlist_print(TokenList t_list){
     printf("\n\033[4mTokens - %d total:\033[0m\n",(int)t_list.size);
-    for(size_t i = 0; i<t_list.size; i++){
+    for(size_t i = 0; i < t_list.size; i++){
         if (t_list.data[i].value == NULL)
             printf("\033[31mError\033[0m\n");
         else
@@ -147,7 +148,7 @@ static int peek_char(LexerContext *context) {
 
 // -------------- TOKENIZATION -----------------
 
-static void tokenize_identifier(TokenList *t_list, LexerContext *context, int symbol){
+static void tokenize_identifier(LexerContext *context, int symbol){
     int i = 0;
     TokenType word_type;
     Buffer buf = char_buffer_create(MAX_TOKEN_LEN);
@@ -167,7 +168,7 @@ static void tokenize_identifier(TokenList *t_list, LexerContext *context, int sy
         word_type = _error;
     }
     tokenlist_push(
-        t_list,
+        context->t_list,
         (Token){
             .type = word_type,
             .value = has_room ? strdup(buf.data) : NULL,
@@ -177,7 +178,7 @@ static void tokenize_identifier(TokenList *t_list, LexerContext *context, int sy
     char_buffer_free(&buf);
 }
 
-static void tokenize_string(TokenList *t_list, LexerContext *context, int symbol){
+static void tokenize_string(LexerContext *context, int symbol){
     int i = 0;
     bool ok = true;
     int opening_line = context->line_number;
@@ -198,7 +199,7 @@ static void tokenize_string(TokenList *t_list, LexerContext *context, int symbol
     }
     if(ok) push_string_char(&buf, &i, '\0');
     tokenlist_push(
-        t_list,
+        context->t_list,
         (Token){
             .type = ok ? _str_literal : _error,
             .value = ok ? strdup(buf.data): NULL,
@@ -208,7 +209,7 @@ static void tokenize_string(TokenList *t_list, LexerContext *context, int symbol
     char_buffer_free(&buf);
 }
 
-static void tokenize_number(TokenList *t_list, LexerContext *context, int symbol){
+static void tokenize_number(LexerContext *context, int symbol){
     int i = 0;
     bool ok = true;
     Buffer buf = char_buffer_create(MAX_TOKEN_LEN);
@@ -253,7 +254,7 @@ static void tokenize_number(TokenList *t_list, LexerContext *context, int symbol
     ungetc(symbol, context->in);
     if (has_room) buf.data[i]='\0';
     tokenlist_push(
-            t_list,
+            context->t_list,
             (Token){
                 .type  = has_room && ok ? number_type : _error,
                 .value = has_room && ok ? strdup(buf.data): NULL,
@@ -263,7 +264,7 @@ static void tokenize_number(TokenList *t_list, LexerContext *context, int symbol
     char_buffer_free(&buf);
 }
 
-static void tokenize_symbol(TokenList *t_list, LexerContext *context, int symbol){
+static void tokenize_symbol(LexerContext *context, int symbol){
     bool ok = true;
     if(isspace(symbol)){
         if(symbol == '\n') context->line_number++;
@@ -309,7 +310,7 @@ static void tokenize_symbol(TokenList *t_list, LexerContext *context, int symbol
     }
     char value[2] = {symbol,'\0'};
     tokenlist_push(
-        t_list,
+        context->t_list,
         (Token){
             .type  = ok ? symbol_type : _error,
             .value = ok ? strdup(value) : NULL,
@@ -318,27 +319,28 @@ static void tokenize_symbol(TokenList *t_list, LexerContext *context, int symbol
     );
 }
 
-void tokenize(TokenList *t_list, LexerContext *context){
+void tokenize(LexerContext *context){
     int symbol;
     while ((symbol = fgetc(context->in))!=EOF){
         if (isalpha(symbol)||symbol=='_') {
-            tokenize_identifier(t_list,context,symbol);
+            tokenize_identifier(context,symbol);
         }else if(symbol=='"'){
-            tokenize_string(t_list,context,symbol);
+            tokenize_string(context,symbol);
         }else if(isdigit(symbol) || (symbol=='.' && isdigit(peek_char(context)))){
-            tokenize_number(t_list,context,symbol);
+            tokenize_number(context,symbol);
         }else{
-            tokenize_symbol(t_list,context,symbol);
+            tokenize_symbol(context,symbol);
         }
     }
     tokenlist_push(
-        t_list,
+        context->t_list,
         (Token){
             .type = _eof,
             .value = "EOF",
             .owned = false
         }
     );
-    t_list->data = realloc(t_list->data,(t_list->size)*sizeof(Token));
+    TokenList *t_list = context->t_list;
+    t_list->data = realloc(t_list->data, t_list->size*sizeof(Token));
     if(!context->has_error) fprintf(stdout,"\033[1;32mNo syntactical errors detected!\033[0m\n");
 }

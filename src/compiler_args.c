@@ -9,25 +9,14 @@
 #ifndef DATA_DIR
 #define DATA_DIR "/usr/local/share/sgfault"
 #endif
+#define NUM_OPTIONS 3
 
-static void print_help(void){
-    char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/docs/help.txt", DATA_DIR);
-    FILE* help_file = fopen(path, "r");
-    if(help_file == NULL){
-        fprintf(stderr,"\033[1;31mError:\033[0m Couldn't open help file.\n");
-        exit(1);
-    }
-    int symbol;
-    while ((symbol = fgetc(help_file))!=EOF){
-        putchar(symbol);
-    }
-    fclose(help_file);
-}
+static void print_help(void);
+
 
 CompilerArgs parse_args(int argc, char *argv[]){
     if(argc < 2 || argc > NUM_OPTIONS+2){
-        fprintf(stderr,"Usage: sgfault <myFile.sg> [flags]\n");
+        fprintf(stderr,"Usage: sgfault <myFile.sg> [options]\n");
         exit(1);
     }
     if(str_eq(argv[argc-1],"-h")||str_eq(argv[argc-1],"--help")){
@@ -35,7 +24,7 @@ CompilerArgs parse_args(int argc, char *argv[]){
         exit(0);
     };
 
-    char *output_path = strdup(argv[argc-1]); // Uses name of src file unless set o-flag
+    char *output_path = strdup(argv[argc-1]); // Uses name of src file if no -o option
     char *slash = strrchr(output_path, '/');
     if (slash) {
         memmove(output_path,slash+1,strlen(slash));
@@ -47,13 +36,13 @@ CompilerArgs parse_args(int argc, char *argv[]){
     char *extension = strrchr(output_path,'.');
     if (!extension || !str_eq(extension,".sg")){
         fprintf(stderr, "\033[1;31mError:\033[0;0m expected a .sg file\n");
-        fprintf(stderr,"Usage: sgfault <myFile.sg> [flags]\n");
+        fprintf(stderr,"Usage: sgfault <myFile.sg> [options]\n");
         exit(1);
     }
     *extension = '\0';
     
     bool verbose = false;
-    //In future check second condition against a list of valid flags.
+    //In future check second condition against a list of valid options.
     for (int i = 1; i < argc-1; i++){
         if (str_eq(argv[i],"--verbose") || str_eq(argv[i],"-v")){
             verbose = true;
@@ -69,9 +58,9 @@ CompilerArgs parse_args(int argc, char *argv[]){
             print_help();
             exit(0);
         }else{
-            fprintf(stderr, "\033[1;31mError:\033[0;0m Undefined flag use\n");
-            fprintf(stderr, "Usage: sgfault <my_file.sg> [flags]\n");
-            fprintf(stderr, "Use --help for a list of valid flags\n");
+            fprintf(stderr, "\033[1;31mError:\033[0;0m Undefined option use\n");
+            fprintf(stderr, "Usage: sgfault <my_file.sg> [options]\n");
+            fprintf(stderr, "Use --help for a list of valid options\n");
             exit(1);
         }
     }
@@ -127,4 +116,19 @@ void build_binary(CompilerArgs *args){
 void compiler_args_free(CompilerArgs *args){
     fclose(args->source_file);
     free(args->output_path);
+}
+
+static void print_help(void){
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/docs/help.txt", DATA_DIR);
+    FILE* help_file = fopen(path, "r");
+    if(help_file == NULL){
+        fprintf(stderr,"\033[1;31mError:\033[0m Couldn't open help file.\n");
+        exit(1);
+    }
+    int symbol;
+    while ((symbol = fgetc(help_file))!=EOF){
+        putchar(symbol);
+    }
+    fclose(help_file);
 }

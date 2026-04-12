@@ -2,7 +2,6 @@
 #define SGFAULT_ARGS_H
 #include <stdio.h>
 #include <stdbool.h>
-#define NUM_OPTIONS 3
 
 typedef struct CompilerArgs{
     char *output_path;

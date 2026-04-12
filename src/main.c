@@ -18,14 +18,14 @@ int main(int argc, char *argv[]){
     CompilerArgs args = parse_args(argc,argv);
     
     // ---- LEXICAL ANALYSIS ----
-    LexerContext lexer_context = lexer_context_create(args.source_file);
     TokenList t_list = tokenlist_create();
-    tokenize(&t_list,&lexer_context);   
+    LexerContext lexer_context = lexer_context_create(&t_list,args.source_file);
+    tokenize(&lexer_context);   
     tokenlist_print(t_list);
 
     // ---- GRAMMAR ANALYSIS / ABSTRACT SYNTAX TREE (AST) GENERATION ----
-    ParserContext parser_context = parser_context_create();
-    parse(&t_list, &parser_context);
+    ParserContext parser_context = parser_context_create(t_list);
+    parse(&parser_context);
 
     // ---- WALK AST -> ASSEMBLY ----
     generate_asm(&args);
