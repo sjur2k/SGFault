@@ -22,7 +22,7 @@ int main(int argc, char *argv[]){
     TokenList t_list = {0};
     LexerContext lexer_context = create_lexer_context(&t_list,args.source_file);
     tokenize(&lexer_context);   
-    print_tokenlist(t_list);
+    //print_tokenlist(t_list);
 
     // ---- GRAMMAR ANALYSIS / GENERATION OF ABSTRACT SYNTAX TREE ----
     ASTList AST_list = {0};

@@ -30,13 +30,13 @@ typedef enum {
 
 typedef struct{
     TokenType type;
-    /* union{
+    union{
         int i;
         float f;
         char *s; //Symbols, keywords, identifiers
-    }; */
-    char *value;
+    }value;
     bool owned;
+    int line_number;
 }Token;
 
 typedef struct{

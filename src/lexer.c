@@ -93,8 +93,9 @@ void tokenize(LexerContext *context){
         context->t_list,
         (Token){
             .type = _eof,
-            .value = "EOF",
-            .owned = false
+            .value.s = "EOF",
+            .owned = false,
+            .line_number = context->line_number,
         }
     );
     TokenList *t_list = context->t_list;
@@ -105,17 +106,25 @@ void tokenize(LexerContext *context){
 void print_tokenlist(TokenList t_list){
     printf("\n\033[4mTokens - %d total:\033[0m\n",(int)t_list.size);
     for(size_t i = 0; i < t_list.size; i++){
-        if (t_list.data[i].value == NULL)
+        Token t = t_list.data[i];
+        if (t.value.s == NULL)
             printf("\033[31mError\033[0m\n");
-        else
-            printf("Value: %-15sType: %s\n",t_list.data[i].value, token_type_names[t_list.data[i].type]);
+        else{
+            char buf[MAX_TOKEN_LEN];
+            switch (t.type){
+                case _int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
+                case _float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
+                default:             snprintf(buf,MAX_TOKEN_LEN,"%s",t.value.s); break;
+            }
+            printf("Value: %-15s Type: %s\n", buf, token_type_names[t.type]);
+        }
     }
     printf("\n");
 }
 
 void free_tokenlist(TokenList *t_list){
     for(size_t i = 0; i < t_list->size; i++){
-        if(t_list->data[i].owned) free(t_list->data[i].value);
+        if(t_list->data[i].owned) free(t_list->data[i].value.s);
     }
     free(t_list->data);
 }
@@ -146,8 +155,9 @@ static void tokenize_identifier(LexerContext *context, int symbol){
         context->t_list,
         (Token){
             .type = word_type,
-            .value = has_room ? str_dup(buf.data) : NULL,
-            .owned = has_room
+            .value.s = has_room ? str_dup(buf.data) : NULL,
+            .owned = has_room,
+            .line_number = context->line_number,
         }
     );
     free_char_buffer(&buf);
@@ -177,8 +187,9 @@ static void tokenize_string(LexerContext *context, int symbol){
         context->t_list,
         (Token){
             .type = ok ? _str_literal : _error,
-            .value = ok ? str_dup(buf.data): NULL,
-            .owned = ok
+            .value.s = ok ? str_dup(buf.data): NULL,
+            .owned = ok,
+            .line_number = context->line_number,
         }
     );
     free_char_buffer(&buf);
@@ -227,15 +238,28 @@ static void tokenize_number(LexerContext *context, int symbol){
         ok = false;
     }
     ungetc(symbol, context->in);
-    if (has_room) buf.data[i]='\0';
-    push_token(
-            context->t_list,
-            (Token){
-                .type  = has_room && ok ? number_type : _error,
-                .value = has_room && ok ? str_dup(buf.data): NULL,
-                .owned = has_room && ok
-            }
-        );
+
+    Token t = {
+        .type = has_room && ok ? number_type : _error,
+        .owned = false,
+        .line_number = context->line_number,
+    };
+
+    if(!ok){
+        t.value.s = NULL; 
+        push_token(context->t_list, t);
+        free_char_buffer(&buf);
+        return;
+    }
+    if (has_room) {
+        buf.data[i]='\0';
+        switch (number_type){
+            case _int_literal: t.value.i = strtol(buf.data,NULL,10); break;
+            case _float_literal: t.value.f = strtof(buf.data,NULL); break;
+            default: break; // Compiler warning silencing
+        }
+    }    
+    push_token(context->t_list,t);
     free_char_buffer(&buf);
 }
 
@@ -247,36 +271,16 @@ static void tokenize_symbol(LexerContext *context, int symbol){
     }
     TokenType symbol_type;
     switch (symbol){
-        case '(':
-            symbol_type = _par_open;
-            break;
-        case ')':
-            symbol_type = _par_close;
-            break;
-        case '=':
-            symbol_type = _equal;
-            break;
-        case '+':
-            symbol_type = _add;
-            break;
-        case '-':
-            symbol_type = _sub;
-            break;
-        case '/':
-            symbol_type = _div;
-            break;
-        case '*':
-            symbol_type = _mul;
-            break;
-        case ';':
-            symbol_type = _semicolon;
-            break;
-        case '.':
-            symbol_type = _point;
-            break;
-        case ',':
-            symbol_type = _comma;
-            break;
+        case '(': symbol_type = _par_open; break;
+        case ')': symbol_type = _par_close; break;
+        case '=': symbol_type = _equal; break;
+        case '+': symbol_type = _add; break;
+        case '-': symbol_type = _sub; break;
+        case '/': symbol_type = _div; break;
+        case '*': symbol_type = _mul; break;
+        case ';': symbol_type = _semicolon; break;
+        case '.': symbol_type = _point; break;
+        case ',': symbol_type = _comma; break;
         default:
             fprintf(stderr,"\033[1;31mError on line %d:\033[0;0m %c is undefined in this context.\n",context->line_number,(unsigned char)symbol);
             context->has_error = true;
@@ -288,14 +292,15 @@ static void tokenize_symbol(LexerContext *context, int symbol){
         context->t_list,
         (Token){
             .type  = ok ? symbol_type : _error,
-            .value = ok ? str_dup(value) : NULL,
-            .owned = ok
+            .value.s = ok ? str_dup(value) : NULL,
+            .owned = ok,
+            .line_number = context->line_number,
         }
     );
 }
 
 // Tokenlist function:
-static void push_token(TokenList *t_list,Token t){
+static void push_token(TokenList *t_list, Token t){
     if(t_list->capacity == t_list->size){
         t_list->capacity = t_list->capacity == 0 ? 8 : t_list->capacity*2;
         t_list->data = realloc(t_list->data,(t_list->capacity)*sizeof(Token));

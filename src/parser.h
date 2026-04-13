@@ -26,7 +26,6 @@ typedef struct{
 }ASTList;
 
 typedef struct{
-    int line_number;
     int token_index;
     bool has_error;
     TokenList t_list;

@@ -15,8 +15,8 @@ static const BindingPower binding_power[_TOKEN_TYPE_COUNT] = {
     [_sub]        = {1.0, 1.1},
     [_mul]        = {2.0, 2.1},
     [_div]        = {2.0, 2.1},
-    [_par_open]   = {0.0, 3.0},
-    [_par_close]  = {3.0, 0.0},
+    [_par_open]   = {3.0, 0.0},
+    [_par_close]  = {0.0, 3.0},
 };
 
 static Node *parse_expression(ParserContext *context, float min_bp);
@@ -35,11 +35,10 @@ void parse(ParserContext *context){
         print_AST(tree);
         if(tree!=NULL){
             printf("\n");
-            context->line_number++;
         }
         Token semi = context->t_list.data[context->token_index++];
         if(semi.type!=_semicolon){
-            fprintf(stderr, "\033[1;31mError on line %d:\033[0m Expected a semicolon.\n",context->line_number);
+            fprintf(stderr, "\033[1;31mError on line %d:\033[0m Expected a semicolon.\n",semi.line_number);
             context->has_error = true;
             context->token_index--;
         }
@@ -49,7 +48,6 @@ void parse(ParserContext *context){
 
 ParserContext create_parser_context(ASTList* AST_list, TokenList t_list){
     return (ParserContext){
-        .line_number = 0,
         .token_index = 0,
         .has_error = false,
         .t_list = t_list,
@@ -61,7 +59,14 @@ void print_AST(Node *root){
     if(root == NULL) return;
     print_AST(root->l);
     print_AST(root->r);
-    printf("%s",root->token.value);
+    Token t = root->token;
+    char buf[MAX_TOKEN_LEN];
+    switch (t.type){
+        case _int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
+        case _float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
+        default:             snprintf(buf,MAX_TOKEN_LEN,"%s",t.value.s); break;
+    }
+    printf("%s",buf);
 }
 
 void free_AST_list(ASTList *AST_list){
@@ -75,7 +80,7 @@ static Node *parse_expression(ParserContext *context, float min_bp){
     TokenList t_list = context->t_list;
     Token token = t_list.data[context->token_index++];
     if(token.type==_error){
-        fprintf(stderr,"\033[1;32mError:\n\033[0mIll-defined token!\n");
+        fprintf(stderr,"\033[1;31mError:\n\033[0mIll-defined token!\n");
         context->has_error = true;
         exit(1); // TODO: graceful error handling
     }
@@ -84,8 +89,19 @@ static Node *parse_expression(ParserContext *context, float min_bp){
     if(is_atom(token.type)){
         lhs = create_node(token,NULL,NULL);
     } else if (is_prefix(token.type)){
+        if(token.type==_par_open){
+            lhs = parse_expression(context, bp_right(token));
+            Token close = context->t_list.data[context->token_index++];
+            if(close.type != _par_close){
+                fprintf(stderr,"\033[1;31mError:\n\033[0m Expected closing parenthesis.\n");
+                context->has_error = true;
+                free_AST(lhs);
+                return NULL;
+            }
+        } else {
         rhs = parse_expression(context, bp_right(token));
         lhs = create_node(token, NULL, rhs);
+        }
     }
 
     while(true){
