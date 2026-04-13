@@ -1,4 +1,3 @@
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -27,17 +26,48 @@ const char *token_type_names[_TOKEN_TYPE_COUNT] = {
     [_eof]              = "Eof",
 };
 
-// ----------- TOKENLISTS(-BUFFERS) ----------------
+typedef struct{
+    const char *word;
+    TokenType type;
+}Keyword;
+
+typedef struct{
+    char *data;
+    int bufsize;
+}Buffer;
+
+static const Keyword keywords[] = {
+    {"return", _return},
+    { NULL   , _error },
+};
+
+// Private function declarations:
+
+// Tokenization functions
+static void tokenize_identifier(LexerContext *context, int symbol);
+static void tokenize_string(LexerContext *context, int symbol);
+static void tokenize_number(LexerContext *context, int symbol);
+static void tokenize_symbol(LexerContext *context, int symbol);
+
+// Tokenlist functions
+static void push_token(TokenList *t_list,Token t);
+
+// Character buffer functions
+static Buffer create_char_buffer(int bufsize);
+static void free_char_buffer(Buffer *buf);
+static int peek_char(LexerContext *context);
+static bool push_char(Buffer *buf, int *i, char c, LexerContext *context);
+static void push_string_char(Buffer *buf, int *i, char c);
+
+// Helper functions
+static bool is_word_delimiter(int c);
+static TokenType keyword_type(const char *word);
+
+
+// Public API
 
 /* Must be freed */
-TokenList tokenlist_create(){
-    TokenList t_list;
-    t_list.size = 0;
-    t_list.capacity = 64;
-    t_list.data = malloc(t_list.capacity*sizeof(Token));
-    return t_list;
-}
-LexerContext lexer_context_create(TokenList *t_list, FILE *source_file){
+LexerContext create_lexer_context(TokenList *t_list, FILE *source_file){
     return (LexerContext){
         .t_list = t_list,
         .in = source_file,
@@ -46,7 +76,33 @@ LexerContext lexer_context_create(TokenList *t_list, FILE *source_file){
     };
 }
 
-void tokenlist_print(TokenList t_list){
+void tokenize(LexerContext *context){
+    int symbol;
+    while ((symbol = fgetc(context->in))!=EOF){
+        if (isalpha(symbol)||symbol=='_') {
+            tokenize_identifier(context,symbol);
+        }else if(symbol=='"'){
+            tokenize_string(context,symbol);
+        }else if(isdigit(symbol) || (symbol=='.' && isdigit(peek_char(context)))){
+            tokenize_number(context,symbol);
+        }else{
+            tokenize_symbol(context,symbol);
+        }
+    }
+    push_token(
+        context->t_list,
+        (Token){
+            .type = _eof,
+            .value = "EOF",
+            .owned = false
+        }
+    );
+    TokenList *t_list = context->t_list;
+    t_list->data = realloc(t_list->data, t_list->size*sizeof(Token));
+    if(!context->has_error) fprintf(stdout,"\033[1;32mNo syntactical errors detected!\033[0m\n");
+}
+
+void print_tokenlist(TokenList t_list){
     printf("\n\033[4mTokens - %d total:\033[0m\n",(int)t_list.size);
     for(size_t i = 0; i < t_list.size; i++){
         if (t_list.data[i].value == NULL)
@@ -57,101 +113,20 @@ void tokenlist_print(TokenList t_list){
     printf("\n");
 }
 
-static void tokenlist_push(TokenList *t_list,Token t){
-    if(t_list->capacity == t_list->size){
-        t_list->capacity *= 2;
-        t_list->data = realloc(t_list->data,(t_list->capacity)*sizeof(Token));
-    }
-    t_list->data[t_list->size++] = t;
-}
-
-void tokenlist_free(TokenList *t_list){
+void free_tokenlist(TokenList *t_list){
     for(size_t i = 0; i < t_list->size; i++){
         if(t_list->data[i].owned) free(t_list->data[i].value);
     }
     free(t_list->data);
-    t_list->data = NULL;
 }
 
-// ------------- KEYWORDS ---------------
+// Private function implementations:
 
-typedef struct{
-    const char *word;
-    TokenType type;
-}Keyword;
-
-static const Keyword keywords[] = {
-    {"return", _return},
-    { NULL   , _error },
-};
-
-static TokenType keyword_type(const char *word){
-    for(int i = 0; keywords[i].word != NULL; i++){
-        if(str_eq(word, keywords[i].word)) return keywords[i].type;
-    }
-    return _error;
-}
-
-// ------------- BUFFERS --------------------------------
-
-typedef struct{
-    char *data;
-    int bufsize;
-}Buffer;
-
-static Buffer char_buffer_create(int bufsize){
-    Buffer buf = {
-        .data = malloc(sizeof(char)*(bufsize+1)), // Explicit room for null-terminator
-        .bufsize = bufsize,
-    };
-    return buf;
-}
-
-static void char_buffer_free(Buffer *buf){
-    free(buf->data);
-    buf->data = NULL;
-}
-
-
-static bool push_char(Buffer *buf, int *i, char c, LexerContext *context){
-    if(*i >= MAX_TOKEN_LEN){
-        fprintf(stderr,"\033[1;31mError on line %d:\033[0;0m Max token length (%d) exceeded\n",context->line_number,MAX_TOKEN_LEN);
-        context->has_error = true;
-        return false;
-    }
-    buf->data[*i] = c;
-    (*i)++;
-    return true;
-}
-
-static void push_string_char(Buffer *buf, int *i, char c){
-    if(*i >= buf->bufsize){
-        buf->bufsize *= 2;
-        buf->data = realloc(buf->data, sizeof(char)*buf->bufsize);
-    }
-    buf->data[*i] = c;
-    (*i)++;
-}
-
-// ---------- HELPERS ------------
-
-static bool is_word_delimiter(int c){
-    if(c==EOF) return true;
-    return !isalnum((unsigned char)c) && c!='_';
-}
-
-static int peek_char(LexerContext *context) {
-    int c = fgetc(context->in);
-    ungetc(c,context->in);
-    return c;
-}
-
-// -------------- TOKENIZATION -----------------
-
+// Tokenization functions:
 static void tokenize_identifier(LexerContext *context, int symbol){
     int i = 0;
     TokenType word_type;
-    Buffer buf = char_buffer_create(MAX_TOKEN_LEN);
+    Buffer buf = create_char_buffer(MAX_TOKEN_LEN);
     bool has_room = push_char(&buf,&i,symbol,context);
     while(!is_word_delimiter(symbol = fgetc(context->in))){
         if(has_room){
@@ -167,22 +142,22 @@ static void tokenize_identifier(LexerContext *context, int symbol){
     } else {
         word_type = _error;
     }
-    tokenlist_push(
+    push_token(
         context->t_list,
         (Token){
             .type = word_type,
-            .value = has_room ? strdup(buf.data) : NULL,
+            .value = has_room ? str_dup(buf.data) : NULL,
             .owned = has_room
         }
     );
-    char_buffer_free(&buf);
+    free_char_buffer(&buf);
 }
 
 static void tokenize_string(LexerContext *context, int symbol){
     int i = 0;
     bool ok = true;
     int opening_line = context->line_number;
-    Buffer buf = char_buffer_create(64); // Resizes automatically. Is limited by size of input document.
+    Buffer buf = create_char_buffer(64); // Resizes automatically. Is limited by size of input document.
     while((symbol = fgetc(context->in))!='"'){
         if (symbol == EOF){
             fprintf(
@@ -198,21 +173,21 @@ static void tokenize_string(LexerContext *context, int symbol){
         push_string_char(&buf, &i, symbol);
     }
     if(ok) push_string_char(&buf, &i, '\0');
-    tokenlist_push(
+    push_token(
         context->t_list,
         (Token){
             .type = ok ? _str_literal : _error,
-            .value = ok ? strdup(buf.data): NULL,
+            .value = ok ? str_dup(buf.data): NULL,
             .owned = ok
         }
     );
-    char_buffer_free(&buf);
+    free_char_buffer(&buf);
 }
 
 static void tokenize_number(LexerContext *context, int symbol){
     int i = 0;
     bool ok = true;
-    Buffer buf = char_buffer_create(MAX_TOKEN_LEN);
+    Buffer buf = create_char_buffer(MAX_TOKEN_LEN);
     TokenType number_type = _int_literal; //Assume integer
     if (symbol == '0' && isdigit(peek_char(context))){
         fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Nonzero numbers cannot begin with 0\n",context->line_number);
@@ -253,15 +228,15 @@ static void tokenize_number(LexerContext *context, int symbol){
     }
     ungetc(symbol, context->in);
     if (has_room) buf.data[i]='\0';
-    tokenlist_push(
+    push_token(
             context->t_list,
             (Token){
                 .type  = has_room && ok ? number_type : _error,
-                .value = has_room && ok ? strdup(buf.data): NULL,
+                .value = has_room && ok ? str_dup(buf.data): NULL,
                 .owned = has_room && ok
             }
         );
-    char_buffer_free(&buf);
+    free_char_buffer(&buf);
 }
 
 static void tokenize_symbol(LexerContext *context, int symbol){
@@ -309,38 +284,74 @@ static void tokenize_symbol(LexerContext *context, int symbol){
             symbol_type = _error;
     }
     char value[2] = {symbol,'\0'};
-    tokenlist_push(
+    push_token(
         context->t_list,
         (Token){
             .type  = ok ? symbol_type : _error,
-            .value = ok ? strdup(value) : NULL,
+            .value = ok ? str_dup(value) : NULL,
             .owned = ok
         }
     );
 }
 
-void tokenize(LexerContext *context){
-    int symbol;
-    while ((symbol = fgetc(context->in))!=EOF){
-        if (isalpha(symbol)||symbol=='_') {
-            tokenize_identifier(context,symbol);
-        }else if(symbol=='"'){
-            tokenize_string(context,symbol);
-        }else if(isdigit(symbol) || (symbol=='.' && isdigit(peek_char(context)))){
-            tokenize_number(context,symbol);
-        }else{
-            tokenize_symbol(context,symbol);
-        }
+// Tokenlist function:
+static void push_token(TokenList *t_list,Token t){
+    if(t_list->capacity == t_list->size){
+        t_list->capacity = t_list->capacity == 0 ? 8 : t_list->capacity*2;
+        t_list->data = realloc(t_list->data,(t_list->capacity)*sizeof(Token));
     }
-    tokenlist_push(
-        context->t_list,
-        (Token){
-            .type = _eof,
-            .value = "EOF",
-            .owned = false
-        }
-    );
-    TokenList *t_list = context->t_list;
-    t_list->data = realloc(t_list->data, t_list->size*sizeof(Token));
-    if(!context->has_error) fprintf(stdout,"\033[1;32mNo syntactical errors detected!\033[0m\n");
+    t_list->data[t_list->size++] = t;
+}
+
+// Character buffer functions:
+static Buffer create_char_buffer(int bufsize){
+    Buffer buf = {
+        .data = safe_malloc(sizeof(char)*(bufsize+1)), // Explicit room for null-terminator
+        .bufsize = bufsize,
+    };
+    return buf;
+}
+
+static void free_char_buffer(Buffer *buf){
+    free(buf->data);
+    buf->data = NULL;
+}
+
+static int peek_char(LexerContext *context){
+    int c = fgetc(context->in);
+    ungetc(c,context->in);
+    return c;
+}
+
+static bool push_char(Buffer *buf, int *i, char c, LexerContext *context){
+    if(*i >= MAX_TOKEN_LEN){
+        fprintf(stderr,"\033[1;31mError on line %d:\033[0;0m Max token length (%d) exceeded\n",context->line_number,MAX_TOKEN_LEN);
+        context->has_error = true;
+        return false;
+    }
+    buf->data[*i] = c;
+    (*i)++;
+    return true;
+}
+
+static void push_string_char(Buffer *buf, int *i, char c){
+    if(*i >= buf->bufsize){
+        buf->bufsize *= 2;
+        buf->data = realloc(buf->data, sizeof(char)*buf->bufsize);
+    }
+    buf->data[*i] = c;
+    (*i)++;
+}
+
+// Helper functions:
+static TokenType keyword_type(const char *word){
+    for(int i = 0; keywords[i].word != NULL; i++){
+        if(str_eq(word, keywords[i].word)) return keywords[i].type;
+    }
+    return _error;
+}
+
+static bool is_word_delimiter(int c){
+    if(c==EOF) return true;
+    return !isalnum((unsigned char)c) && c!='_';
 }

@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "compiler_args.h"
 #include "lexer.h"
 #include "parser.h"
@@ -18,15 +19,16 @@ int main(int argc, char *argv[]){
     CompilerArgs args = parse_args(argc,argv);
     
     // ---- LEXICAL ANALYSIS ----
-    TokenList t_list = tokenlist_create();
-    LexerContext lexer_context = lexer_context_create(&t_list,args.source_file);
+    TokenList t_list = {0};
+    LexerContext lexer_context = create_lexer_context(&t_list,args.source_file);
     tokenize(&lexer_context);   
-    tokenlist_print(t_list);
+    print_tokenlist(t_list);
 
-    // ---- GRAMMAR ANALYSIS / ABSTRACT SYNTAX TREE (AST) GENERATION ----
-    ParserContext parser_context = parser_context_create(t_list);
+    // ---- GRAMMAR ANALYSIS / GENERATION OF ABSTRACT SYNTAX TREE ----
+    ASTList AST_list = {0};
+    ParserContext parser_context = create_parser_context(&AST_list,t_list);
     parse(&parser_context);
-
+    
     // ---- WALK AST -> ASSEMBLY ----
     generate_asm(&args);
 
@@ -34,8 +36,9 @@ int main(int argc, char *argv[]){
     build_binary(&args);
 
     // ---- CLEANUP / GARBAGE COLLECTION ----
-    compiler_args_free(&args);
-    tokenlist_free(&t_list);
-    
+    free_compiler_args(&args);
+    free_tokenlist(&t_list);
+    free_AST_list(&AST_list);
+
     return lexer_context.has_error || parser_context.has_error ? 1 : 0;
 }

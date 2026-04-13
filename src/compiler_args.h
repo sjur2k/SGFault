@@ -12,5 +12,5 @@ typedef struct CompilerArgs{
 
 CompilerArgs parse_args(int argc, char *argv[]);
 void build_binary(CompilerArgs *args);
-void compiler_args_free(CompilerArgs *args);
+void free_compiler_args(CompilerArgs *args);
 #endif

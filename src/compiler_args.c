@@ -1,8 +1,8 @@
 #include "compiler_args.h"
 
+#include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <string.h>
 #include <linux/limits.h>
 #include "utils.h"
 
@@ -11,9 +11,10 @@
 #endif
 #define NUM_OPTIONS 3
 
+// Private helper function declaration:
 static void print_help(void);
 
-
+// Public API
 CompilerArgs parse_args(int argc, char *argv[]){
     if(argc < 2 || argc > NUM_OPTIONS+2){
         fprintf(stderr,"Usage: sgfault <myFile.sg> [options]\n");
@@ -24,7 +25,7 @@ CompilerArgs parse_args(int argc, char *argv[]){
         exit(0);
     };
 
-    char *output_path = strdup(argv[argc-1]); // Uses name of src file if no -o option
+    char *output_path = str_dup(argv[argc-1]); // Uses name of src file if no -o option
     char *slash = strrchr(output_path, '/');
     if (slash) {
         memmove(output_path,slash+1,strlen(slash));
@@ -52,7 +53,7 @@ CompilerArgs parse_args(int argc, char *argv[]){
                 exit(1);
             }
             free(output_path);
-            output_path = strdup(argv[i+1]);
+            output_path = str_dup(argv[i+1]);
             i++;
         }else if(str_eq(argv[i],"--help") || str_eq(argv[i],"-h")){
             print_help();
@@ -113,11 +114,13 @@ void build_binary(CompilerArgs *args){
     }
 }
 
-void compiler_args_free(CompilerArgs *args){
+void free_compiler_args(CompilerArgs *args){
     fclose(args->source_file);
     free(args->output_path);
 }
 
+
+// Private helper function implementation
 static void print_help(void){
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/docs/help.txt", DATA_DIR);

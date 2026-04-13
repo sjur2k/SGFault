@@ -30,6 +30,11 @@ typedef enum {
 
 typedef struct{
     TokenType type;
+    /* union{
+        int i;
+        float f;
+        char *s; //Symbols, keywords, identifiers
+    }; */
     char *value;
     bool owned;
 }Token;
@@ -49,9 +54,8 @@ typedef struct{
 
 extern const char *token_type_names[_TOKEN_TYPE_COUNT];
 
-TokenList tokenlist_create(void);
-void tokenlist_print(TokenList t_list);
-void tokenlist_free(TokenList *t_list);
+void print_tokenlist(TokenList t_list);
+void free_tokenlist(TokenList *t_list);
 void tokenize(LexerContext *context);
-LexerContext lexer_context_create(TokenList *t_list, FILE *source_file);
+LexerContext create_lexer_context(TokenList *t_list, FILE *source_file);
 #endif
