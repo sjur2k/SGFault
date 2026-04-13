@@ -19,6 +19,8 @@ typedef enum {
     _semicolon,
     _par_open,
     _par_close,
+    _bra_open,
+    _bra_close,
     _sub,
     _add,
     _mul,

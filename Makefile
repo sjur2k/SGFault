@@ -1,7 +1,7 @@
 CC = gcc
 CSTD = c99
 CFLAGS = -std=$(CSTD) -Wall -Wextra -Wpedantic -Wstrict-prototypes -g -DDATA_DIR=\"/usr/local/share/sgfault\"
-SRC = src/main.c src/utils.c src/lexer.c src/compiler_args.c src/parser.c
+SRC = src/main.c src/utils.c src/lexer.c src/compiler_args.c src/parser.c src/assembly.c
 
 COMPILER_BINARY = build/sgfault
 FILE = testing/test.sg

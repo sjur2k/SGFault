@@ -31,8 +31,8 @@ typedef struct{
     TokenList t_list;
     ASTList *AST_list;
 }ParserContext;
+
 ParserContext create_parser_context(ASTList *AST_list, TokenList t_list);
 void parse(ParserContext *context);
-void print_AST(Node *root);
 void free_AST_list(ASTList *AST_list);
 #endif

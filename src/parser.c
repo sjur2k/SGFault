@@ -10,37 +10,53 @@ typedef struct{
 static const BindingPower binding_power[_TOKEN_TYPE_COUNT] = {
     [_eof]        = {0.0, 0.0},
     [_semicolon]  = {0.0, 0.0},
+    [_comma]      = {2.1, 2.0},
     [_return]     = {0.1, 0.0},
-    [_add]        = {1.0, 1.1},
-    [_sub]        = {1.0, 1.1},
-    [_mul]        = {2.0, 2.1},
-    [_div]        = {2.0, 2.1},
-    [_par_open]   = {3.0, 0.0},
-    [_par_close]  = {0.0, 3.0},
+    [_equal]      = {1.0, 1.1},
+    [_add]        = {3.0, 3.1},
+    [_sub]        = {3.0, 3.1},
+    [_mul]        = {4.0, 4.1},
+    [_div]        = {4.0, 4.1},
+    [_bra_open]   = {5.0, 0.0},
+    [_bra_close]  = {0.0, 5.0},
+    [_par_open]   = {5.0, 0.0},
+    [_par_close]  = {0.0, 5.0},
 };
 
+// -------- Private functions declarations ----------
+
+// Recursive parse function:
 static Node *parse_expression(ParserContext *context, float min_bp);
+
+// Parsing helper functions:
 static Node *create_node(Token token, Node* lhs, Node* rhs);
 static bool is_atom(TokenType type);
 static bool is_prefix(TokenType type);
 static float bp_left(Token t);
 static float bp_right(Token t);
+
+// Abstract syntax tree functions:
 static void push_AST(ASTList* AST_list, Node* AST);
+static void print_AST(Node *root);
 static void free_AST(Node *root);
 
+// ------------ Public API ---------------
+
+// Main parsing loop:
 void parse(ParserContext *context){
     float min_binding_power = 0.0;
     while (context->t_list.data[context->token_index].type != _eof) {
         Node *tree = parse_expression(context, min_binding_power);
-        print_AST(tree);
-        if(tree!=NULL){
+        if(tree){
+            print_AST(tree);
             printf("\n");
         }
+        // If missing semi, go to next semi and continue parsing.
         Token semi = context->t_list.data[context->token_index++];
-        if(semi.type!=_semicolon){
+        while(semi.type!=_semicolon){
             fprintf(stderr, "\033[1;31mError on line %d:\033[0m Expected a semicolon.\n",semi.line_number);
             context->has_error = true;
-            context->token_index--;
+            semi = context->t_list.data[context->token_index++];
         }
         push_AST(context->AST_list,tree);
     }
@@ -55,20 +71,6 @@ ParserContext create_parser_context(ASTList* AST_list, TokenList t_list){
     };
 }
 
-void print_AST(Node *root){
-    if(root == NULL) return;
-    print_AST(root->l);
-    print_AST(root->r);
-    Token t = root->token;
-    char buf[MAX_TOKEN_LEN];
-    switch (t.type){
-        case _int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
-        case _float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
-        default:             snprintf(buf,MAX_TOKEN_LEN,"%s",t.value.s); break;
-    }
-    printf("%s",buf);
-}
-
 void free_AST_list(ASTList *AST_list){
     for (size_t i = 0; i < AST_list->size; i++){
         free_AST(AST_list->data[i]);
@@ -76,6 +78,9 @@ void free_AST_list(ASTList *AST_list){
     free(AST_list->data);
 }
 
+// --------- Private functions implementations -----------
+
+// Recursive parse function
 static Node *parse_expression(ParserContext *context, float min_bp){
     TokenList t_list = context->t_list;
     Token token = t_list.data[context->token_index++];
@@ -93,11 +98,21 @@ static Node *parse_expression(ParserContext *context, float min_bp){
             lhs = parse_expression(context, bp_right(token));
             Token close = context->t_list.data[context->token_index++];
             if(close.type != _par_close){
-                fprintf(stderr,"\033[1;31mError:\n\033[0m Expected closing parenthesis.\n");
+                fprintf(stderr,"\033[1;31mError on line %d:\n\033[0m Expected closing parenthesis.\n",close.line_number);
                 context->has_error = true;
                 free_AST(lhs);
                 return NULL;
             }
+        } else if(token.type==_bra_open){
+            lhs = parse_expression(context,bp_right(token));
+            Token close = context->t_list.data[context->token_index++];
+            if(close.type != _bra_close){
+                fprintf(stderr,"\033[1;31mError on line %d:\n\033[0m Expected closing bracket.\n",close.line_number);
+                context->has_error = true;
+                free_AST(lhs);
+                return NULL;
+            }
+            lhs = create_node(token,NULL,lhs);
         } else {
         rhs = parse_expression(context, bp_right(token));
         lhs = create_node(token, NULL, rhs);
@@ -116,6 +131,16 @@ static Node *parse_expression(ParserContext *context, float min_bp){
     return lhs;
 }
 
+// Parsing helper functions:
+
+static Node *create_node(Token token, Node *lhs, Node *rhs){
+    Node *node = safe_malloc(sizeof(Node));
+    node->token = token;
+    node->l = lhs;
+    node->r = rhs;
+    return node;
+}
+
 static bool is_atom(TokenType type){
     return (type == _str_literal   ||
             type == _float_literal ||
@@ -124,8 +149,9 @@ static bool is_atom(TokenType type){
 }
 
 static bool is_prefix(TokenType type){
-    return (type == _return    ||
-            type == _par_open);
+    return (type == _return   ||
+            type == _par_open ||
+            type == _bra_open);
 }
 
 static float bp_left(Token t){
@@ -136,13 +162,7 @@ static float bp_right(Token t){
     return binding_power[t.type].right;
 }
 
-static Node *create_node(Token token, Node *lhs, Node *rhs){
-    Node *node = safe_malloc(sizeof(Node));
-    node->token = token;
-    node->l = lhs;
-    node->r = rhs;
-    return node;
-}
+// Abstract syntax tree functions:
 
 static void push_AST(ASTList *AST_list, Node* AST){
     if(AST_list->capacity == AST_list->size){
@@ -150,6 +170,20 @@ static void push_AST(ASTList *AST_list, Node* AST){
         AST_list->data = realloc(AST_list->data,AST_list->capacity*sizeof(Node *));
     }
     AST_list->data[AST_list->size++] = AST;
+}
+
+static void print_AST(Node *root){
+    if(root == NULL) return;
+    print_AST(root->l);
+    print_AST(root->r);
+    Token t = root->token;
+    char buf[MAX_TOKEN_LEN];
+    switch (t.type){
+        case _int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
+        case _float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
+        default:             snprintf(buf,MAX_TOKEN_LEN,"%s",t.value.s); break;
+    }
+    printf("%s",buf);
 }
 
 static void free_AST(Node *root){

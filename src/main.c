@@ -2,18 +2,7 @@
 #include "compiler_args.h"
 #include "lexer.h"
 #include "parser.h"
-
-void generate_asm(CompilerArgs *args){
-    //PLACEHOLDER CODE:
-    fprintf(args->out,"global _start\n\n");
-    fprintf(args->out,"_start:\n");
-    fprintf(args->out,"\tmov rdi, 0\n");
-    fprintf(args->out,"\tmov rax, 60\n");
-    fprintf(args->out,"\tsyscall");
-    fclose(args->out);
-    
-    args->out = NULL;
-}
+#include "assembly.h"
 
 int main(int argc, char *argv[]){
     CompilerArgs args = parse_args(argc,argv);
@@ -30,7 +19,8 @@ int main(int argc, char *argv[]){
     parse(&parser_context);
     
     // ---- WALK AST -> ASSEMBLY ----
-    generate_asm(&args);
+    AsmContext asm_context = create_asm_context(args.out,AST_list);
+    generate_asm(&asm_context);
 
     // ---- ASSEMBLE AND LINK ----
     build_binary(&args);

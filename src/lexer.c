@@ -13,11 +13,13 @@ const char *token_type_names[_TOKEN_TYPE_COUNT] = {
     [_str_literal]      = "Str",
     [_float_literal]    = "Float",
     [_equal]            = "Equal",
-    [_point]            = "Point",
+    [_point]            = "Point", // Maybe later
     [_comma]            = "Comma",
     [_semicolon]        = "Semicolon",
     [_par_open]         = "Par_open",
     [_par_close]        = "Par_close",
+    [_bra_open]         = "Bra_open",
+    [_bra_close]        = "Bra_close",
     [_sub]              = "Sub",
     [_add]              = "Add",
     [_mul]              = "Mul",
@@ -41,7 +43,7 @@ static const Keyword keywords[] = {
     { NULL   , _error },
 };
 
-// Private function declarations:
+// --------- Private function declarations -----------
 
 // Tokenization functions
 static void tokenize_identifier(LexerContext *context, int symbol);
@@ -64,7 +66,7 @@ static bool is_word_delimiter(int c);
 static TokenType keyword_type(const char *word);
 
 
-// Public API
+// ------------ Public API -------------
 
 /* Must be freed */
 LexerContext create_lexer_context(TokenList *t_list, FILE *source_file){
@@ -76,6 +78,7 @@ LexerContext create_lexer_context(TokenList *t_list, FILE *source_file){
     };
 }
 
+// Main tokenization function:
 void tokenize(LexerContext *context){
     int symbol;
     while ((symbol = fgetc(context->in))!=EOF){
@@ -129,7 +132,8 @@ void free_tokenlist(TokenList *t_list){
     free(t_list->data);
 }
 
-// Private function implementations:
+
+// -------- Private function implementations -----------
 
 // Tokenization functions:
 static void tokenize_identifier(LexerContext *context, int symbol){
@@ -273,6 +277,8 @@ static void tokenize_symbol(LexerContext *context, int symbol){
     switch (symbol){
         case '(': symbol_type = _par_open; break;
         case ')': symbol_type = _par_close; break;
+        case '[': symbol_type = _bra_open; break;
+        case ']': symbol_type = _bra_close; break;
         case '=': symbol_type = _equal; break;
         case '+': symbol_type = _add; break;
         case '-': symbol_type = _sub; break;
