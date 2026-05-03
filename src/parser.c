@@ -7,20 +7,20 @@ typedef struct{
     float right;
 }BindingPower;
 
-static const BindingPower binding_power[_TOKEN_TYPE_COUNT] = {
-    [_eof]        = {0.0, 0.0},
-    [_semicolon]  = {0.0, 0.0},
-    [_comma]      = {2.1, 2.0},
-    [_return]     = {0.1, 0.0},
-    [_equal]      = {1.0, 1.1},
-    [_add]        = {3.0, 3.1},
-    [_sub]        = {3.0, 3.1},
-    [_mul]        = {4.0, 4.1},
-    [_div]        = {4.0, 4.1},
-    [_bra_open]   = {5.0, 0.0},
-    [_bra_close]  = {0.0, 5.0},
-    [_par_open]   = {5.0, 0.0},
-    [_par_close]  = {0.0, 5.0},
+static const BindingPower binding_power[TOKEN_TYPE_COUNT] = {
+    [TOKEN_EOF]        = {0.0, 0.0},
+    [TOKEN_SEMICOLON]  = {0.0, 0.0},
+    [TOKEN_COMMA]      = {2.1, 2.0},
+    [TOKEN_RETURN]     = {0.1, 0.0},
+    [TOKEN_EQUAL]      = {1.0, 1.1},
+    [TOKEN_PLUS]       = {3.0, 3.1},
+    [TOKEN_MINUS]      = {3.0, 3.1},
+    [TOKEN_MUL]        = {4.0, 4.1},
+    [TOKEN_DIV]        = {4.0, 4.1},
+    [TOKEN_BRA_OPEN]   = {5.0, 0.0},
+    [TOKEN_BRA_CLOSE]  = {0.0, 5.0},
+    [TOKEN_PAR_OPEN]   = {5.0, 0.0},
+    [TOKEN_PAR_CLOSE]  = {0.0, 5.0},
 };
 
 // -------- Private functions declarations ----------
@@ -35,17 +35,14 @@ static bool is_prefix(TokenType type);
 static float bp_left(Token t);
 static float bp_right(Token t);
 
-// Abstract syntax tree functions:
-static void push_AST(ASTList* AST_list, Node* AST);
-static void print_AST(Node *root);
-static void free_AST(Node *root);
-
+// Error logging
+static void parser_error(Token token, ParserContext context, char *msg);
 // ------------ Public API ---------------
 
 // Main parsing loop:
 void parse(ParserContext *context){
     float min_binding_power = 0.0;
-    while (context->t_list.data[context->token_index].type != _eof) {
+    while (context->t_list.data[context->token_index].type != TOKEN_EOF) {
         Node *tree = parse_expression(context, min_binding_power);
         if(tree){
             print_AST(tree);
@@ -53,8 +50,8 @@ void parse(ParserContext *context){
         }
         // If missing semi, go to next semi and continue parsing.
         Token semi = context->t_list.data[context->token_index++];
-        while(semi.type!=_semicolon){
-            fprintf(stderr, "\033[1;31mError on line %d:\033[0m Expected a semicolon.\n",semi.line_number);
+        while(semi.type!=TOKEN_SEMICOLON){
+            fprintf(stderr, "\033[1;31mError on line %d:\033[0m Expected a semicolon.\n",semi.line);
             context->has_error = true;
             semi = context->t_list.data[context->token_index++];
         }
@@ -62,20 +59,14 @@ void parse(ParserContext *context){
     }
 }
 
-ParserContext create_parser_context(ASTList* AST_list, TokenList t_list){
+ParserContext create_parser_context(ASTList* AST_list, char *source_name, TokenList t_list){
     return (ParserContext){
         .token_index = 0,
+        .src_name = source_name,
         .has_error = false,
         .t_list = t_list,
         .AST_list = AST_list,
     };
-}
-
-void free_AST_list(ASTList *AST_list){
-    for (size_t i = 0; i < AST_list->size; i++){
-        free_AST(AST_list->data[i]);
-    }
-    free(AST_list->data);
 }
 
 // --------- Private functions implementations -----------
@@ -84,7 +75,7 @@ void free_AST_list(ASTList *AST_list){
 static Node *parse_expression(ParserContext *context, float min_bp){
     TokenList t_list = context->t_list;
     Token token = t_list.data[context->token_index++];
-    if(token.type==_error){
+    if(token.type==TOKEN_ERROR){
         fprintf(stderr,"\033[1;31mError:\n\033[0mIll-defined token!\n");
         context->has_error = true;
         exit(1); // TODO: graceful error handling
@@ -92,22 +83,35 @@ static Node *parse_expression(ParserContext *context, float min_bp){
     
     struct Node *rhs, *lhs;
     if(is_atom(token.type)){
-        lhs = create_node(token,NULL,NULL);
+        switch (token.type){
+        case TOKEN_INT_LITERAL:
+            lhs = create_int_lit(token);
+            break;
+        case TOKEN_FLOAT_LITERAL:
+            lhs = create_float_lit(token);
+            break;
+        case TOKEN_IDENTIFIER:
+            lhs = create_ident(token);
+            break;
+        default:
+            parser_error(token,*context,"Expected atomic token.");
+            break;
+        }
     } else if (is_prefix(token.type)){
-        if(token.type==_par_open){
+        if(token.type==TOKEN_PAR_OPEN){
             lhs = parse_expression(context, bp_right(token));
             Token close = context->t_list.data[context->token_index++];
-            if(close.type != _par_close){
-                fprintf(stderr,"\033[1;31mError on line %d:\n\033[0m Expected closing parenthesis.\n",close.line_number);
+            if(close.type != TOKEN_PAR_CLOSE){
+                fprintf(stderr,"\033[1;31mError on line %d:\n\033[0m Expected closing parenthesis.\n",close.line);
                 context->has_error = true;
                 free_AST(lhs);
                 return NULL;
             }
-        } else if(token.type==_bra_open){
+        } else if(token.type==TOKEN_BRA_OPEN){
             lhs = parse_expression(context,bp_right(token));
             Token close = context->t_list.data[context->token_index++];
-            if(close.type != _bra_close){
-                fprintf(stderr,"\033[1;31mError on line %d:\n\033[0m Expected closing bracket.\n",close.line_number);
+            if(close.type != TOKEN_BRA_CLOSE){
+                fprintf(stderr,"\033[1;31mError on line %d:\n\033[0m Expected closing bracket.\n",close.line);
                 context->has_error = true;
                 free_AST(lhs);
                 return NULL;
@@ -121,7 +125,7 @@ static Node *parse_expression(ParserContext *context, float min_bp){
 
     while(true){
         Token next_token = t_list.data[context->token_index];
-        if (next_token.type == _eof || is_atom(next_token.type) || bp_left(next_token) <= min_bp){
+        if (next_token.type == TOKEN_EOF || is_atom(next_token.type) || bp_left(next_token) <= min_bp){
             break;
         }
         context->token_index++;
@@ -133,25 +137,17 @@ static Node *parse_expression(ParserContext *context, float min_bp){
 
 // Parsing helper functions:
 
-static Node *create_node(Token token, Node *lhs, Node *rhs){
-    Node *node = safe_malloc(sizeof(Node));
-    node->token = token;
-    node->l = lhs;
-    node->r = rhs;
-    return node;
-}
-
 static bool is_atom(TokenType type){
-    return (type == _str_literal   ||
-            type == _float_literal ||
-            type == _int_literal   ||
-            type == _identifier);
+    return (type == TOKEN_STR_LITERAL   ||
+            type == TOKEN_FLOAT_LITERAL ||
+            type == TOKEN_INT_LITERAL   ||
+            type == TOKEN_IDENTIFIER);
 }
 
 static bool is_prefix(TokenType type){
-    return (type == _return   ||
-            type == _par_open ||
-            type == _bra_open);
+    return (type == TOKEN_RETURN   ||
+            type == TOKEN_PAR_OPEN ||
+            type == TOKEN_BRA_OPEN);
 }
 
 static float bp_left(Token t){
@@ -162,33 +158,6 @@ static float bp_right(Token t){
     return binding_power[t.type].right;
 }
 
-// Abstract syntax tree functions:
-
-static void push_AST(ASTList *AST_list, Node* AST){
-    if(AST_list->capacity == AST_list->size){
-        AST_list->capacity = AST_list->capacity == 0 ? 8 : 2*AST_list->capacity;
-        AST_list->data = realloc(AST_list->data,AST_list->capacity*sizeof(Node *));
-    }
-    AST_list->data[AST_list->size++] = AST;
-}
-
-static void print_AST(Node *root){
-    if(root == NULL) return;
-    print_AST(root->l);
-    print_AST(root->r);
-    Token t = root->token;
-    char buf[MAX_TOKEN_LEN];
-    switch (t.type){
-        case _int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
-        case _float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
-        default:             snprintf(buf,MAX_TOKEN_LEN,"%s",t.value.s); break;
-    }
-    printf("%s",buf);
-}
-
-static void free_AST(Node *root){
-    if(root == NULL) return;
-    free_AST(root->l);
-    free_AST(root->r);
-    free(root);
+static void parser_error(Token token, ParserContext context, char* msg){
+    fprintf(stderr, "%s:%d:%d: \033[1;31mError\n\033[0m: %s\n",context.src_name,token.line,token.col,msg);
 }

@@ -1,5 +1,5 @@
-#include "assembly.h"
 #include <stdio.h>
+#include "asm_gen.h"
 #include "parser.h"
 
 void generate_asm(AsmContext *context){

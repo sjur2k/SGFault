@@ -1,9 +1,8 @@
-#include "compiler_args.h"
-
 #include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <linux/limits.h>
+#include "compiler_args.h"
 #include "utils.h"
 
 #ifndef DATA_DIR
@@ -24,7 +23,7 @@ CompilerArgs parse_args(int argc, char *argv[]){
         print_help();
         exit(0);
     };
-
+    char *src_name = str_dup(argv[argc-1]);
     char *output_path = str_dup(argv[argc-1]); // Uses name of src file if no -o option
     char *slash = strrchr(output_path, '/');
     if (slash) {
@@ -82,6 +81,7 @@ CompilerArgs parse_args(int argc, char *argv[]){
     CompilerArgs args = {
         .output_path    = output_path,
         .source_file    = source_file,
+        .source_name    = src_name,
         .out            = out,
         .verbose        = verbose,
     };
@@ -117,6 +117,7 @@ void build_binary(CompilerArgs *args){
 void free_compiler_args(CompilerArgs *args){
     fclose(args->source_file);
     free(args->output_path);
+    free(args->source_name);
 }
 
 

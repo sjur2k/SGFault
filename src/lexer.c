@@ -6,26 +6,28 @@
 #include "lexer.h"
 #include "utils.h"
 
-const char *token_type_names[_TOKEN_TYPE_COUNT] = {
-    [_error]            = "Error",
-    [_identifier]       = "Identifier",
-    [_int_literal]      = "Int",
-    [_str_literal]      = "Str",
-    [_float_literal]    = "Float",
-    [_equal]            = "Equal",
-    [_point]            = "Point", // Maybe later
-    [_comma]            = "Comma",
-    [_semicolon]        = "Semicolon",
-    [_par_open]         = "Par_open",
-    [_par_close]        = "Par_close",
-    [_bra_open]         = "Bra_open",
-    [_bra_close]        = "Bra_close",
-    [_sub]              = "Sub",
-    [_add]              = "Add",
-    [_mul]              = "Mul",
-    [_div]              = "Div",
-    [_return]           = "Return",
-    [_eof]              = "Eof",
+#define TAB_WIDTH 4
+
+const char *token_type_names[TOKEN_TYPE_COUNT] = {
+    [TOKEN_ERROR]            = "Error",
+    [TOKEN_IDENTIFIER]       = "Identifier",
+    [TOKEN_INT_LITERAL]      = "Int",
+    [TOKEN_STR_LITERAL]      = "Str",
+    [TOKEN_FLOAT_LITERAL]    = "Float",
+    [TOKEN_EQUAL]            = "Equal",
+    [TOKEN_POINT]            = "Point", // Maybe later
+    [TOKEN_COMMA]            = "Comma",
+    [TOKEN_SEMICOLON]        = "Semicolon",
+    [TOKEN_PAR_OPEN]         = "Par_open",
+    [TOKEN_PAR_CLOSE]        = "Par_close",
+    [TOKEN_BRA_OPEN]         = "Bra_open",
+    [TOKEN_BRA_CLOSE]        = "Bra_close",
+    [TOKEN_MINUS]            = "Minus",
+    [TOKEN_PLUS]             = "Plus",
+    [TOKEN_MUL]              = "Mul",
+    [TOKEN_DIV]              = "Div",
+    [TOKEN_RETURN]           = "Return",
+    [TOKEN_EOF]              = "Eof",
 };
 
 typedef struct{
@@ -39,8 +41,8 @@ typedef struct{
 }Buffer;
 
 static const Keyword keywords[] = {
-    {"return", _return},
-    { NULL   , _error },
+    {"return", TOKEN_RETURN},
+    { NULL   , TOKEN_ERROR },
 };
 
 // --------- Private function declarations -----------
@@ -65,15 +67,18 @@ static void push_string_char(Buffer *buf, int *i, char c);
 static bool is_word_delimiter(int c);
 static TokenType keyword_type(const char *word);
 
-
+// Error logging
+static void lexer_error(LexerContext context, char* msg);
 // ------------ Public API -------------
 
 /* Must be freed */
-LexerContext create_lexer_context(TokenList *t_list, FILE *source_file){
+LexerContext create_lexer_context(TokenList *t_list, char *source_name, FILE *source_file){
     return (LexerContext){
         .t_list = t_list,
         .in = source_file,
-        .line_number = 1,
+        .src_name = source_name,
+        .line = 1,
+        .col = 0, // "Initializes" to 1 when 1st symbol is read.
         .has_error = false,
     };
 }
@@ -82,6 +87,7 @@ LexerContext create_lexer_context(TokenList *t_list, FILE *source_file){
 void tokenize(LexerContext *context){
     int symbol;
     while ((symbol = fgetc(context->in))!=EOF){
+        context->col++;
         if (isalpha(symbol)||symbol=='_') {
             tokenize_identifier(context,symbol);
         }else if(symbol=='"'){
@@ -95,10 +101,11 @@ void tokenize(LexerContext *context){
     push_token(
         context->t_list,
         (Token){
-            .type = _eof,
+            .type = TOKEN_EOF,
             .value.s = "EOF",
             .owned = false,
-            .line_number = context->line_number,
+            .line = context->line,
+            .col = context->col,
         }
     );
     TokenList *t_list = context->t_list;
@@ -115,8 +122,8 @@ void print_tokenlist(TokenList t_list){
         else{
             char buf[MAX_TOKEN_LEN];
             switch (t.type){
-                case _int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
-                case _float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
+                case TOKEN_INT_LITERAL:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
+                case TOKEN_FLOAT_LITERAL: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
                 default:             snprintf(buf,MAX_TOKEN_LEN,"%s",t.value.s); break;
             }
             printf("Value: %-15s Type: %s\n", buf, token_type_names[t.type]);
@@ -132,6 +139,15 @@ void free_tokenlist(TokenList *t_list){
     free(t_list->data);
 }
 
+static void lexer_error(LexerContext context, char* msg){
+    fprintf(stderr, "%s:%d:%d: \033[31mError\033[0m: %s\n",
+        context.src_name,
+        context.line,
+        context.col,
+        msg
+    );
+}
+
 
 // -------- Private function implementations -----------
 
@@ -143,6 +159,7 @@ static void tokenize_identifier(LexerContext *context, int symbol){
     bool has_room = push_char(&buf,&i,symbol,context);
     while(!is_word_delimiter(symbol = fgetc(context->in))){
         if(has_room){
+            context->col++;
             has_room = push_char(&buf, &i, symbol, context);
         }
     }
@@ -151,9 +168,9 @@ static void tokenize_identifier(LexerContext *context, int symbol){
     if(has_room) {
         buf.data[i]='\0';
         TokenType kw = keyword_type(buf.data);
-        word_type = kw == _error ? _identifier : kw;
+        word_type = kw == TOKEN_ERROR ? TOKEN_IDENTIFIER : kw;
     } else {
-        word_type = _error;
+        word_type = TOKEN_ERROR;
     }
     push_token(
         context->t_list,
@@ -161,7 +178,8 @@ static void tokenize_identifier(LexerContext *context, int symbol){
             .type = word_type,
             .value.s = has_room ? str_dup(buf.data) : NULL,
             .owned = has_room,
-            .line_number = context->line_number,
+            .line = context->line,
+            .col = context->col,
         }
     );
     free_char_buffer(&buf);
@@ -170,30 +188,30 @@ static void tokenize_identifier(LexerContext *context, int symbol){
 static void tokenize_string(LexerContext *context, int symbol){
     int i = 0;
     bool ok = true;
-    int opening_line = context->line_number;
     Buffer buf = create_char_buffer(64); // Resizes automatically. Is limited by size of input document.
     while((symbol = fgetc(context->in))!='"'){
+        context->col++;
         if (symbol == EOF){
-            fprintf(
-                stderr, 
-                "\033[1;31mError on line %d:\033[0;0m String literal beginning on line %d is missing closing quote\n",
-                context->line_number, opening_line
-            );
+            lexer_error(*context,"String literal is missing closing quote");
             context->has_error = true;
             ok = false;
             break;
         }
-        if (symbol == '\n') context->line_number++;
+        if (symbol == '\n'){
+            context->line++;
+            context->col = 1;
+        }
         push_string_char(&buf, &i, symbol);
     }
     if(ok) push_string_char(&buf, &i, '\0');
     push_token(
         context->t_list,
         (Token){
-            .type = ok ? _str_literal : _error,
+            .type = ok ? TOKEN_STR_LITERAL : TOKEN_ERROR,
             .value.s = ok ? str_dup(buf.data): NULL,
             .owned = ok,
-            .line_number = context->line_number,
+            .line = context->line,
+            .col = context->col,
         }
     );
     free_char_buffer(&buf);
@@ -203,50 +221,60 @@ static void tokenize_number(LexerContext *context, int symbol){
     int i = 0;
     bool ok = true;
     Buffer buf = create_char_buffer(MAX_TOKEN_LEN);
-    TokenType number_type = _int_literal; //Assume integer
+    TokenType number_type = TOKEN_INT_LITERAL; //Assume integer
     if (symbol == '0' && isdigit(peek_char(context))){
-        fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Nonzero numbers cannot begin with 0\n",context->line_number);
+        lexer_error(*context,"Nonzero numbers cannot begin with 0.");
         context->has_error = true;
         ok = false;
     }
-    if (symbol == '.') number_type = _float_literal;
+    if (symbol == '.') number_type = TOKEN_FLOAT_LITERAL;
     bool has_room = push_char(&buf,&i,symbol,context);
     while(isdigit(symbol = fgetc(context->in))){
-        if(has_room) has_room = push_char(&buf,&i,symbol,context);
+        if(has_room){
+            context->col++;
+            has_room = push_char(&buf,&i,symbol,context);
+        }
     }
     
     if (symbol=='.'){
-        if(has_room) has_room = push_char(&buf, &i, symbol,context);
-        if(number_type == _float_literal){
-            fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Floating point numbers can only have one decimal point.\n",context->line_number);
+        if(has_room){
+            context->col++;
+            has_room = push_char(&buf, &i, symbol, context);
+        } 
+        if(number_type == TOKEN_FLOAT_LITERAL){
+            lexer_error(*context,"Floating point numbers can only have one decimal point.");
             context->has_error = true;
             ok = false;
         }
-        number_type = _float_literal;
+        number_type = TOKEN_FLOAT_LITERAL;
         if(!isdigit(peek_char(context))){
-            fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Floating points without decimals are undefined.\n",context->line_number);
+            lexer_error(*context,"Floating points without decimals are undefined.");
             context->has_error = true;
             ok = false;
         }
         while(isdigit(symbol = fgetc(context->in))){
-            if(has_room) has_room = push_char(&buf,&i,symbol,context);
+            if(has_room){
+                context->col++;
+                has_room = push_char(&buf,&i,symbol,context);
+            }
         }
+        context->col++;
         if(symbol == '.'){
-            fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Floating point numbers can only have one decimal point.\n",context->line_number);
+            lexer_error(*context,"Floating point numbers can only have one decimal point.");
             context->has_error = true;
             ok = false;
         }
     } else if (isalpha(symbol) || symbol == '_'){
-        fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Identifiers cannot begin with a number.\n",context->line_number);
+        lexer_error(*context,"Identifiers cannot begin with a number.");
         context->has_error = true;
         ok = false;
     }
     ungetc(symbol, context->in);
 
     Token t = {
-        .type = has_room && ok ? number_type : _error,
+        .type = has_room && ok ? number_type : TOKEN_ERROR,
         .owned = false,
-        .line_number = context->line_number,
+        .line = context->line,
     };
 
     if(!ok){
@@ -258,8 +286,8 @@ static void tokenize_number(LexerContext *context, int symbol){
     if (has_room) {
         buf.data[i]='\0';
         switch (number_type){
-            case _int_literal: t.value.i = strtol(buf.data,NULL,10); break;
-            case _float_literal: t.value.f = strtof(buf.data,NULL); break;
+            case TOKEN_INT_LITERAL: t.value.i = strtol(buf.data,NULL,10); break;
+            case TOKEN_FLOAT_LITERAL: t.value.f = strtof(buf.data,NULL); break;
             default: break; // Compiler warning silencing
         }
     }    
@@ -269,38 +297,53 @@ static void tokenize_number(LexerContext *context, int symbol){
 
 static void tokenize_symbol(LexerContext *context, int symbol){
     bool ok = true;
-    if(isspace(symbol)){
-        if(symbol == '\n') context->line_number++;
-        return;
+    if(isspace((unsigned char)symbol)){
+        switch (symbol){
+            case ' ':
+                context->col++;
+                break;
+            case '\n':
+                context->line++;
+                context->col = 1;
+                break;
+            case '\t':
+                context->col += TAB_WIDTH - ((context->col-1) % TAB_WIDTH);
+                break;
+            default:
+                break;
+            return;
+        }
     }
     TokenType symbol_type;
     switch (symbol){
-        case '(': symbol_type = _par_open; break;
-        case ')': symbol_type = _par_close; break;
-        case '[': symbol_type = _bra_open; break;
-        case ']': symbol_type = _bra_close; break;
-        case '=': symbol_type = _equal; break;
-        case '+': symbol_type = _add; break;
-        case '-': symbol_type = _sub; break;
-        case '/': symbol_type = _div; break;
-        case '*': symbol_type = _mul; break;
-        case ';': symbol_type = _semicolon; break;
-        case '.': symbol_type = _point; break;
-        case ',': symbol_type = _comma; break;
+        case '(': symbol_type = TOKEN_PAR_OPEN; break;
+        case ')': symbol_type = TOKEN_PAR_CLOSE; break;
+        case '[': symbol_type = TOKEN_BRA_OPEN; break;
+        case ']': symbol_type = TOKEN_BRA_CLOSE; break;
+        case '=': symbol_type = TOKEN_EQUAL; break;
+        case '+': symbol_type = TOKEN_PLUS; break;
+        case '-': symbol_type = TOKEN_MINUS; break;
+        case '/': symbol_type = TOKEN_DIV; break;
+        case '*': symbol_type = TOKEN_MUL; break;
+        case ';': symbol_type = TOKEN_SEMICOLON; break;
+        case '.': symbol_type = TOKEN_POINT; break;
+        case ',': symbol_type = TOKEN_COMMA; break;
         default:
-            fprintf(stderr,"\033[1;31mError on line %d:\033[0;0m %c is undefined in this context.\n",context->line_number,(unsigned char)symbol);
+            lexer_error(*context,"Symbol is undefined in this context:");
+            fprintf(stderr,"\033[1;31m%c\033[0;0m\n",(unsigned char)symbol);
             context->has_error = true;
             ok = false;
-            symbol_type = _error;
+            symbol_type = TOKEN_ERROR;
     }
     char value[2] = {symbol,'\0'};
     push_token(
         context->t_list,
         (Token){
-            .type  = ok ? symbol_type : _error,
+            .type  = ok ? symbol_type : TOKEN_ERROR,
             .value.s = ok ? str_dup(value) : NULL,
             .owned = ok,
-            .line_number = context->line_number,
+            .line = context->line,
+            .col = context->col,
         }
     );
 }
@@ -336,7 +379,7 @@ static int peek_char(LexerContext *context){
 
 static bool push_char(Buffer *buf, int *i, char c, LexerContext *context){
     if(*i >= MAX_TOKEN_LEN){
-        fprintf(stderr,"\033[1;31mError on line %d:\033[0;0m Max token length (%d) exceeded\n",context->line_number,MAX_TOKEN_LEN);
+        lexer_error(*context, "Max token length exceeded.");
         context->has_error = true;
         return false;
     }
@@ -359,7 +402,7 @@ static TokenType keyword_type(const char *word){
     for(int i = 0; keywords[i].word != NULL; i++){
         if(str_eq(word, keywords[i].word)) return keywords[i].type;
     }
-    return _error;
+    return TOKEN_ERROR;
 }
 
 static bool is_word_delimiter(int c){

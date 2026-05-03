@@ -3,36 +3,17 @@
 
 #include <stdbool.h>
 #include "lexer.h"
-
-typedef enum {
-    op_add,
-    op_sub,
-    op_mul,
-    op_div,
-    op_eof,
-    op_NUM
-}OperatorType;
-
-typedef struct Node {
-    Token token;
-    struct Node *l;
-    struct Node *r;
-}Node;
-
-typedef struct{
-    Node **data;
-    size_t size;
-    size_t capacity;
-}ASTList;
+#include "ast.h"
 
 typedef struct{
     int token_index;
     bool has_error;
+    char *src_name;
     TokenList t_list;
     ASTList *AST_list;
 }ParserContext;
 
-ParserContext create_parser_context(ASTList *AST_list, TokenList t_list);
+ParserContext create_parser_context(ASTList *AST_list, char* source_name, TokenList t_list);
 void parse(ParserContext *context);
 void free_AST_list(ASTList *AST_list);
 #endif

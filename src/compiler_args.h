@@ -5,6 +5,7 @@
 
 typedef struct CompilerArgs{
     char *output_path;
+    char *source_name;
     FILE *source_file;
     FILE *out;
     bool verbose;
