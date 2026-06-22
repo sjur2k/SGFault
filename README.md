@@ -13,5 +13,10 @@ It is merely a practice project done for fun.
 
 ## Installation for local user ##
 `git clone https://github.com/sjur2k/SGFault.git`\
+then (linux):\
 `cd sgfault`\
-`(sudo) make install`
+`make install`\
+or (cross-platform):\
+`cd sgfault/build`\
+`cmake ..`\
+`cmake --build .`

@@ -7,16 +7,16 @@ typedef struct{
     float right;
 }BindingPower;
 
-static const BindingPower binding_power[_TOKEN_TYPE_COUNT] = {
-    [_eof]        = {0.0, 0.0},
-    [_semicolon]  = {0.0, 0.0},
-    [_return]     = {0.1, 0.0},
-    [_add]        = {1.0, 1.1},
-    [_sub]        = {1.0, 1.1},
-    [_mul]        = {2.0, 2.1},
-    [_div]        = {2.0, 2.1},
-    [_par_open]   = {3.0, 0.0},
-    [_par_close]  = {0.0, 3.0},
+static const BindingPower binding_power[TOK_TYPE_COUNT] = {
+    [tok_eof]        = {0.0, 0.0},
+    [tok_semicolon]  = {0.0, 0.0},
+    [tok_return]     = {0.1, 0.0},
+    [tok_add]        = {1.0, 1.1},
+    [tok_sub]        = {1.0, 1.1},
+    [tok_mul]        = {2.0, 2.1},
+    [tok_div]        = {2.0, 2.1},
+    [tok_par_open]   = {3.0, 0.0},
+    [tok_par_close]  = {0.0, 3.0},
 };
 
 static Node *parse_expression(ParserContext *context, float min_bp);
@@ -30,14 +30,14 @@ static void free_AST(Node *root);
 
 void parse(ParserContext *context){
     float min_binding_power = 0.0;
-    while (context->t_list.data[context->token_index].type != _eof) {
+    while (context->t_list.data[context->token_index].type != tok_eof) {
         Node *tree = parse_expression(context, min_binding_power);
         print_AST(tree);
         if(tree!=NULL){
             printf("\n");
         }
         Token semi = context->t_list.data[context->token_index++];
-        if(semi.type!=_semicolon){
+        if(semi.type!=tok_semicolon){
             fprintf(stderr, "\033[1;31mError on line %d:\033[0m Expected a semicolon.\n",semi.line_number);
             context->has_error = true;
             context->token_index--;
@@ -62,8 +62,8 @@ void print_AST(Node *root){
     Token t = root->token;
     char buf[MAX_TOKEN_LEN];
     switch (t.type){
-        case _int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
-        case _float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
+        case tok_int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
+        case tok_float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
         default:             snprintf(buf,MAX_TOKEN_LEN,"%s",t.value.s); break;
     }
     printf("%s",buf);
@@ -79,7 +79,7 @@ void free_AST_list(ASTList *AST_list){
 static Node *parse_expression(ParserContext *context, float min_bp){
     TokenList t_list = context->t_list;
     Token token = t_list.data[context->token_index++];
-    if(token.type==_error){
+    if(token.type==tok_error){
         fprintf(stderr,"\033[1;31mError:\n\033[0mIll-defined token!\n");
         context->has_error = true;
         exit(1); // TODO: graceful error handling
@@ -89,10 +89,10 @@ static Node *parse_expression(ParserContext *context, float min_bp){
     if(is_atom(token.type)){
         lhs = create_node(token,NULL,NULL);
     } else if (is_prefix(token.type)){
-        if(token.type==_par_open){
+        if(token.type==tok_par_open){
             lhs = parse_expression(context, bp_right(token));
             Token close = context->t_list.data[context->token_index++];
-            if(close.type != _par_close){
+            if(close.type != tok_par_close){
                 fprintf(stderr,"\033[1;31mError:\n\033[0m Expected closing parenthesis.\n");
                 context->has_error = true;
                 free_AST(lhs);
@@ -106,7 +106,7 @@ static Node *parse_expression(ParserContext *context, float min_bp){
 
     while(true){
         Token next_token = t_list.data[context->token_index];
-        if (next_token.type == _eof || is_atom(next_token.type) || bp_left(next_token) <= min_bp){
+        if (next_token.type == tok_eof || is_atom(next_token.type) || bp_left(next_token) <= min_bp){
             break;
         }
         context->token_index++;
@@ -117,15 +117,15 @@ static Node *parse_expression(ParserContext *context, float min_bp){
 }
 
 static bool is_atom(TokenType type){
-    return (type == _str_literal   ||
-            type == _float_literal ||
-            type == _int_literal   ||
-            type == _identifier);
+    return (type == tok_str_literal   ||
+            type == tok_float_literal ||
+            type == tok_int_literal   ||
+            type == tok_identifier);
 }
 
 static bool is_prefix(TokenType type){
-    return (type == _return    ||
-            type == _par_open);
+    return (type == tok_return    ||
+            type == tok_par_open);
 }
 
 static float bp_left(Token t){

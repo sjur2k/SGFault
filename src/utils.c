@@ -5,6 +5,14 @@
 
 #include "utils.h"
 
+#ifndef SGFAULT_DIR
+    #ifdef _WIN32
+        #define SGFAULT_DIR "C:\\sjur2k\\SGFault" // Specifically for the work pc. TODO: Generalize
+    #else
+        #define SGFAULT_DIR "/usr/local/share/sgfault"
+    #endif
+#endif
+
 void *safe_malloc(size_t size){
     void *ptr = malloc(size);
     if(!ptr){
@@ -22,4 +30,8 @@ char *str_dup(const char *s){
 
 bool str_eq(const char *str1, const char *str2){
     return strcmp(str1,str2)==0;
+}
+
+const char *get_data_dir(void){
+    return SGFAULT_DIR;
 }

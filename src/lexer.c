@@ -6,24 +6,24 @@
 #include "lexer.h"
 #include "utils.h"
 
-const char *token_type_names[_TOKEN_TYPE_COUNT] = {
-    [_error]            = "Error",
-    [_identifier]       = "Identifier",
-    [_int_literal]      = "Int",
-    [_str_literal]      = "Str",
-    [_float_literal]    = "Float",
-    [_equal]            = "Equal",
-    [_point]            = "Point",
-    [_comma]            = "Comma",
-    [_semicolon]        = "Semicolon",
-    [_par_open]         = "Par_open",
-    [_par_close]        = "Par_close",
-    [_sub]              = "Sub",
-    [_add]              = "Add",
-    [_mul]              = "Mul",
-    [_div]              = "Div",
-    [_return]           = "Return",
-    [_eof]              = "Eof",
+const char *token_type_names[TOK_TYPE_COUNT] = {
+    [tok_error]            = "Error",
+    [tok_identifier]       = "Identifier",
+    [tok_int_literal]      = "Int",
+    [tok_str_literal]      = "Str",
+    [tok_float_literal]    = "Float",
+    [tok_equal]            = "Equal",
+    [tok_point]            = "Point",
+    [tok_comma]            = "Comma",
+    [tok_semicolon]        = "Semicolon",
+    [tok_par_open]         = "Par_open",
+    [tok_par_close]        = "Par_close",
+    [tok_sub]              = "Sub",
+    [tok_add]              = "Add",
+    [tok_mul]              = "Mul",
+    [tok_div]              = "Div",
+    [tok_return]           = "Return",
+    [tok_eof]              = "Eof",
 };
 
 typedef struct{
@@ -37,8 +37,8 @@ typedef struct{
 }Buffer;
 
 static const Keyword keywords[] = {
-    {"return", _return},
-    { NULL   , _error },
+    {"return", tok_return},
+    { NULL   , tok_error },
 };
 
 // Private function declarations:
@@ -92,7 +92,7 @@ void tokenize(LexerContext *context){
     push_token(
         context->t_list,
         (Token){
-            .type = _eof,
+            .type = tok_eof,
             .value.s = "EOF",
             .owned = false,
             .line_number = context->line_number,
@@ -112,8 +112,8 @@ void print_tokenlist(TokenList t_list){
         else{
             char buf[MAX_TOKEN_LEN];
             switch (t.type){
-                case _int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
-                case _float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
+                case tok_int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
+                case tok_float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
                 default:             snprintf(buf,MAX_TOKEN_LEN,"%s",t.value.s); break;
             }
             printf("Value: %-15s Type: %s\n", buf, token_type_names[t.type]);
@@ -147,9 +147,9 @@ static void tokenize_identifier(LexerContext *context, int symbol){
     if(has_room) {
         buf.data[i]='\0';
         TokenType kw = keyword_type(buf.data);
-        word_type = kw == _error ? _identifier : kw;
+        word_type = kw == tok_error ? tok_identifier : kw;
     } else {
-        word_type = _error;
+        word_type = tok_error;
     }
     push_token(
         context->t_list,
@@ -186,7 +186,7 @@ static void tokenize_string(LexerContext *context, int symbol){
     push_token(
         context->t_list,
         (Token){
-            .type = ok ? _str_literal : _error,
+            .type = ok ? tok_str_literal : tok_error,
             .value.s = ok ? str_dup(buf.data): NULL,
             .owned = ok,
             .line_number = context->line_number,
@@ -199,13 +199,13 @@ static void tokenize_number(LexerContext *context, int symbol){
     int i = 0;
     bool ok = true;
     Buffer buf = create_char_buffer(MAX_TOKEN_LEN);
-    TokenType number_type = _int_literal; //Assume integer
+    TokenType number_type = tok_int_literal; //Assume integer
     if (symbol == '0' && isdigit(peek_char(context))){
         fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Nonzero numbers cannot begin with 0\n",context->line_number);
         context->has_error = true;
         ok = false;
     }
-    if (symbol == '.') number_type = _float_literal;
+    if (symbol == '.') number_type = tok_float_literal;
     bool has_room = push_char(&buf,&i,symbol,context);
     while(isdigit(symbol = fgetc(context->in))){
         if(has_room) has_room = push_char(&buf,&i,symbol,context);
@@ -213,12 +213,12 @@ static void tokenize_number(LexerContext *context, int symbol){
     
     if (symbol=='.'){
         if(has_room) has_room = push_char(&buf, &i, symbol,context);
-        if(number_type == _float_literal){
+        if(number_type == tok_float_literal){
             fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Floating point numbers can only have one decimal point.\n",context->line_number);
             context->has_error = true;
             ok = false;
         }
-        number_type = _float_literal;
+        number_type = tok_float_literal;
         if(!isdigit(peek_char(context))){
             fprintf(stderr, "\033[1;31mError on line %d:\033[0;0m Floating points without decimals are undefined.\n",context->line_number);
             context->has_error = true;
@@ -240,7 +240,7 @@ static void tokenize_number(LexerContext *context, int symbol){
     ungetc(symbol, context->in);
 
     Token t = {
-        .type = has_room && ok ? number_type : _error,
+        .type = has_room && ok ? number_type : tok_error,
         .owned = false,
         .line_number = context->line_number,
     };
@@ -254,8 +254,8 @@ static void tokenize_number(LexerContext *context, int symbol){
     if (has_room) {
         buf.data[i]='\0';
         switch (number_type){
-            case _int_literal: t.value.i = strtol(buf.data,NULL,10); break;
-            case _float_literal: t.value.f = strtof(buf.data,NULL); break;
+            case tok_int_literal: t.value.i = strtol(buf.data,NULL,10); break;
+            case tok_float_literal: t.value.f = strtof(buf.data,NULL); break;
             default: break; // Compiler warning silencing
         }
     }    
@@ -271,27 +271,27 @@ static void tokenize_symbol(LexerContext *context, int symbol){
     }
     TokenType symbol_type;
     switch (symbol){
-        case '(': symbol_type = _par_open; break;
-        case ')': symbol_type = _par_close; break;
-        case '=': symbol_type = _equal; break;
-        case '+': symbol_type = _add; break;
-        case '-': symbol_type = _sub; break;
-        case '/': symbol_type = _div; break;
-        case '*': symbol_type = _mul; break;
-        case ';': symbol_type = _semicolon; break;
-        case '.': symbol_type = _point; break;
-        case ',': symbol_type = _comma; break;
+        case '(': symbol_type = tok_par_open; break;
+        case ')': symbol_type = tok_par_close; break;
+        case '=': symbol_type = tok_equal; break;
+        case '+': symbol_type = tok_add; break;
+        case '-': symbol_type = tok_sub; break;
+        case '/': symbol_type = tok_div; break;
+        case '*': symbol_type = tok_mul; break;
+        case ';': symbol_type = tok_semicolon; break;
+        case '.': symbol_type = tok_point; break;
+        case ',': symbol_type = tok_comma; break;
         default:
             fprintf(stderr,"\033[1;31mError on line %d:\033[0;0m %c is undefined in this context.\n",context->line_number,(unsigned char)symbol);
             context->has_error = true;
             ok = false;
-            symbol_type = _error;
+            symbol_type = tok_error;
     }
     char value[2] = {symbol,'\0'};
     push_token(
         context->t_list,
         (Token){
-            .type  = ok ? symbol_type : _error,
+            .type  = ok ? symbol_type : tok_error,
             .value.s = ok ? str_dup(value) : NULL,
             .owned = ok,
             .line_number = context->line_number,
@@ -353,7 +353,7 @@ static TokenType keyword_type(const char *word){
     for(int i = 0; keywords[i].word != NULL; i++){
         if(str_eq(word, keywords[i].word)) return keywords[i].type;
     }
-    return _error;
+    return tok_error;
 }
 
 static bool is_word_delimiter(int c){

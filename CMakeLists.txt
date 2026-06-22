@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(SGFault C)
+project(sgfault C)
 set(CMAKE_C_STANDARD 99)
 add_compile_options(-Wall -Wextra -Wpedantic -Wstrict-prototypes)
 

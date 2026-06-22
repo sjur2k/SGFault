@@ -3,12 +3,9 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <linux/limits.h>
+#include <limits.h>
 #include "utils.h"
 
-#ifndef DATA_DIR
-#define DATA_DIR "/usr/local/share/sgfault"
-#endif
 #define NUM_OPTIONS 3
 
 // Private helper function declaration:
@@ -123,7 +120,7 @@ void free_compiler_args(CompilerArgs *args){
 // Private helper function implementation
 static void print_help(void){
     char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/docs/help.txt", DATA_DIR);
+    snprintf(path, sizeof(path), "%s/docs/help.txt", get_data_dir());
     FILE* help_file = fopen(path, "r");
     if(help_file == NULL){
         fprintf(stderr,"\033[1;31mError:\033[0m Couldn't open help file.\n");

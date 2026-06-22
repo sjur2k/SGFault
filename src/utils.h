@@ -11,4 +11,5 @@ char *str_dup(const char *s);
 /* Helper function since strcmp is counter intuitive */
 bool str_eq(const char *str1, const char *str2);
 
+const char *get_data_dir(void);
 #endif

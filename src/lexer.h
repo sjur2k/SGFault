@@ -8,24 +8,24 @@
 #define MAX_TOKEN_LEN 256
 
 typedef enum {
-    _error,
-    _identifier,
-    _int_literal,
-    _str_literal,
-    _float_literal,
-    _equal,
-    _point,
-    _comma,
-    _semicolon,
-    _par_open,
-    _par_close,
-    _sub,
-    _add,
-    _mul,
-    _div,
-    _return,
-    _eof,
-    _TOKEN_TYPE_COUNT
+    tok_error,
+    tok_identifier,
+    tok_int_literal,
+    tok_str_literal,
+    tok_float_literal,
+    tok_equal,
+    tok_point,
+    tok_comma,
+    tok_semicolon,
+    tok_par_open,
+    tok_par_close,
+    tok_sub,
+    tok_add,
+    tok_mul,
+    tok_div,
+    tok_return,
+    tok_eof,
+    TOK_TYPE_COUNT
 }TokenType;
 
 typedef struct{
@@ -52,7 +52,7 @@ typedef struct{
     bool has_error;
 } LexerContext;
 
-extern const char *token_type_names[_TOKEN_TYPE_COUNT];
+extern const char *token_type_names[TOK_TYPE_COUNT];
 
 void print_tokenlist(TokenList t_list);
 void free_tokenlist(TokenList *t_list);
