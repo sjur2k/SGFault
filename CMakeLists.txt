@@ -18,3 +18,8 @@ target_compile_definitions(sgfault PRIVATE
 
 install(TARGETS sgfault DESTINATION bin)
 install(DIRECTORY docs/ DESTINATION share/docs)
+if(WIN32)
+    install(DIRECTORY tools/windows DESTINATION tools)
+else()
+    install(DIRECTORY tools/linux DESTINATION tools)
+endif()

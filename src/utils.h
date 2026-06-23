@@ -12,4 +12,6 @@ char *str_dup(const char *s);
 bool str_eq(const char *str1, const char *str2);
 
 const char *get_data_dir(void);
+const char *get_nasm_path(void);
+const char *get_gcc_path(void);
 #endif
