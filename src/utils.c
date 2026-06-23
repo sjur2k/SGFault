@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
+#include <windows.h>
 
 #include "utils.h"
 
@@ -47,4 +48,44 @@ const char *get_nasm_path(void){
 
 const char *get_gcc_path(void){
     return GCC_PATH;
+}
+
+const char *get_nasm_os(void){
+    #ifdef _WIN32
+        return "win64";
+    #else
+        return "elf64";
+    #endif
+}
+
+const char *get_extension(void){
+    #ifdef _WIN32
+        return ".exe";
+    #else
+        return "";
+    #endif
+}
+
+int run_command(const char *command){
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd), "%s", command);
+    
+    BOOL ok = CreateProcessA(NULL,cmd,NULL,NULL,FALSE,0,NULL,NULL,&si,&pi);
+    
+    if(!ok){
+        fprintf(stderr,"\033[1;31mError:\033[0;0m Process creation failed (%lu)\n",GetLastError());
+        return -1;
+    }
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exit_code = 0;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return (int)exit_code;
 }

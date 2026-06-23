@@ -32,7 +32,7 @@ void parse(ParserContext *context){
     float min_binding_power = 0.0;
     while (context->t_list.data[context->token_index].type != tok_eof) {
         Node *tree = parse_expression(context, min_binding_power);
-        print_AST(tree);
+        //print_AST(tree);
         if(tree!=NULL){
             printf("\n");
         }
@@ -64,7 +64,7 @@ void print_AST(Node *root){
     switch (t.type){
         case tok_int_literal:   snprintf(buf,MAX_TOKEN_LEN,"%d",t.value.i); break;
         case tok_float_literal: snprintf(buf,MAX_TOKEN_LEN,"%f",t.value.f); break;            
-        default:             snprintf(buf,MAX_TOKEN_LEN,"%s",t.value.s); break;
+        default:                snprintf(buf,MAX_TOKEN_LEN,"%s",t.value.s); break;
     }
     printf("%s",buf);
 }

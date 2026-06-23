@@ -90,32 +90,29 @@ void build_binary(CompilerArgs *args){
     //Tell system to assemble and link:
     const char *nasm_path = get_nasm_path();
     const char *gcc_path = get_gcc_path();
-    char nasm_command[2*PATH_MAX + 23]; // This is a bit pedantic, but helps me build understanding
+    const char *nasm_os = get_nasm_os();
+    const char *extension = get_extension();
+    char nasm_command[2*PATH_MAX + 23]; // A bit pedantic.
     char linker_command[2*PATH_MAX + 8];
     char asm_file[PATH_MAX+4];
-    char o_file[PATH_MAX+2];
-    
-    snprintf(nasm_command, sizeof(nasm_command), "%s -f win64 %s.asm -o %s.o", nasm_path, args->output_path, args->output_path);
-    printf("Assembling with command: %s\n", nasm_command);
-    snprintf(linker_command, sizeof(linker_command), "%s %s.o -o %s.exe", gcc_path, args->output_path, args->output_path);
+    char obj_file[PATH_MAX+2];
+   
+    snprintf(nasm_command, sizeof(nasm_command), "%s -f %s %s.asm -o %s.o", nasm_path, nasm_os, args->output_path, args->output_path);
+    snprintf(linker_command, sizeof(linker_command), "%s %s.o -o %s%s", gcc_path, args->output_path, args->output_path, extension);
     snprintf(asm_file, sizeof(asm_file), "%s.asm", args->output_path);
-    snprintf(o_file, sizeof(o_file), "%s.o", args->output_path);
+    snprintf(obj_file, sizeof(obj_file), "%s.o", args->output_path);
 
-    if (system(nasm_command) != 0){
-        /* remove(asm_file);
-        remove(o_file); */
+    if (run_command(nasm_command) != 0){
         fprintf(stderr, "\033[1;31mError:\033[0;0m assembly failed\n");
         exit(1);
     }
-    if (system(linker_command) != 0){
-        /* remove(asm_file);
-        remove(o_file); */
+    if (run_command(linker_command) != 0){
         fprintf(stderr,"\033[1;31mError:\033[0;0m linking failed\n");
         exit(1);
     }
     if (!args->verbose){
         remove(asm_file);
-        remove(o_file);
+        remove(obj_file);
     }
 }
 
@@ -123,7 +120,6 @@ void free_compiler_args(CompilerArgs *args){
     fclose(args->source_file);
     free(args->output_path);
 }
-
 
 // Private helper function implementation
 static void print_help(void){

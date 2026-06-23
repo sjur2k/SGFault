@@ -2,3 +2,4 @@ build/
 testing/
 .vscode/
 NOTES.txt
+tools/windows/mingw64/

@@ -16,9 +16,10 @@ void generate_asm_linux(CompilerArgs *args){
 }
 void generate_asm_windows(CompilerArgs *args){
     //PLACEHOLDER CODE:
-    fprintf(args->out,"global _start\n\n");
-    fprintf(args->out,"extern ExitProcess\n");
-    fprintf(args->out,"_start:\n");
+    fprintf(args->out,"global main\n");
+    fprintf(args->out,"extern ExitProcess\n\n");
+    fprintf(args->out,"section .text\n");
+    fprintf(args->out,"main:\n");
     fprintf(args->out,"\tsub rsp, 40\n");
     fprintf(args->out,"\tmov rcx, 0\n");
     fprintf(args->out,"\tcall ExitProcess\n");
